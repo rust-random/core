@@ -1,0 +1,211 @@
+name: Main tests
+
+on:
+  push:
+    branches: [ master, '0.[0-9]+' ]
+    paths-ignore:
+      - "**.md"
+      - "benches/**"
+  pull_request:
+    branches: [ master, '0.[0-9]+' ]
+    paths-ignore:
+      - "**.md"
+      - "benches/**"
+  schedule:
+    - cron: '0 0 * * SUN'
+
+permissions:
+  contents: read #  to fetch code (actions/checkout)
+
+jobs:
+  clippy-fmt:
+    name: Check Clippy and rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: clippy, rustfmt
+      - name: Check Clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: Check rustfmt
+        run: cargo fmt --all -- --check
+
+  check-doc:
+    name: Check doc
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: "-Dwarnings --cfg docsrs -Zunstable-options --generate-link-to-definition"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+      - name: rand
+        run: cargo doc --all-features --no-deps
+      - name: rand_core
+        run: cargo doc --all-features --package rand_core --no-deps
+      - name: rand_chacha
+        run: cargo doc --all-features --package rand_chacha --no-deps
+      - name: rand_pcg
+        run: cargo doc --all-features --package rand_pcg --no-deps
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            toolchain: stable
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            toolchain: stable
+            # TODO: also aarch64 / M1
+          - os: windows-latest
+            target: x86_64-pc-windows-gnu
+            toolchain: stable
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            toolchain: beta
+            # Test both windows-gnu and windows-msvc; use beta rust on one
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            variant: MSRV
+            toolchain: 1.85.0
+          - os: ubuntu-latest
+            deps: sudo apt-get update ; sudo apt install gcc-multilib
+            target: i686-unknown-linux-gnu
+            toolchain: nightly
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            toolchain: nightly
+            variant: minimal_versions
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Not MSRV
+        if: ${{ matrix.variant != 'MSRV' }}
+        run: cargo generate-lockfile --ignore-rust-version
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+      - run: ${{ matrix.deps }}
+      - name: Maybe minimal versions
+        if: ${{ matrix.variant == 'minimal_versions' }}
+        run: |
+          cargo generate-lockfile -Z minimal-versions
+      - name: Maybe nightly
+        if: ${{ matrix.toolchain == 'nightly' }}
+        run: |
+          cargo test --target ${{ matrix.target }} --features=nightly
+          cargo test --target ${{ matrix.target }} --all-features
+          cargo test --target ${{ matrix.target }} --lib --tests --no-default-features
+      - name: Test rand
+        run: |
+          cargo test --target ${{ matrix.target }} --lib --tests --no-default-features
+          cargo build --target ${{ matrix.target }} --no-default-features --features alloc,os_rng,small_rng,unbiased
+          cargo test --target ${{ matrix.target }} --lib --tests --no-default-features --features=alloc,os_rng,small_rng
+          cargo test --target ${{ matrix.target }} --examples
+      - name: Test rand (all stable features)
+        run: |
+          cargo test --target ${{ matrix.target }} --features=serde,log,small_rng
+      - name: Test rand_core
+        run: |
+          cargo test --target ${{ matrix.target }} --manifest-path rand_core/Cargo.toml --no-default-features
+          cargo test --target ${{ matrix.target }} --manifest-path rand_core/Cargo.toml --features serde
+      - name: Test rand_pcg
+        run: cargo test --target ${{ matrix.target }} --manifest-path rand_pcg/Cargo.toml --features=serde
+      - name: Test rand_chacha
+        run: cargo test --target ${{ matrix.target }} --manifest-path rand_chacha/Cargo.toml --features=serde
+
+  test-cross:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: powerpc-unknown-linux-gnu
+            toolchain: stable
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          target: ${{ matrix.target }}
+          toolchain: ${{ matrix.toolchain }}
+      - name: Cache cargo plugins
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/
+          key: ${{ runner.os }}-cargo-plugins
+      - name: Install cross
+        run: cargo install cross || true
+      - name: Test
+        run: |
+          # all stable features:
+          cross test --no-fail-fast --target ${{ matrix.target }} --features=serde,log,small_rng
+          cross test --no-fail-fast --target ${{ matrix.target }} --examples
+          cross test --no-fail-fast --target ${{ matrix.target }} --manifest-path rand_core/Cargo.toml
+          cross test --no-fail-fast --target ${{ matrix.target }} --manifest-path rand_pcg/Cargo.toml --features=serde
+          cross test --no-fail-fast --target ${{ matrix.target }} --manifest-path rand_chacha/Cargo.toml
+
+  test-miri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+      - name: Test rand
+        run: |
+          cargo miri test --no-default-features --lib --tests
+          cargo miri test --features=log,small_rng
+          cargo miri test --manifest-path rand_core/Cargo.toml
+          cargo miri test --manifest-path rand_core/Cargo.toml --features=serde
+          cargo miri test --manifest-path rand_core/Cargo.toml --no-default-features
+          cargo miri test --manifest-path rand_pcg/Cargo.toml --features=serde
+          cargo miri test --manifest-path rand_chacha/Cargo.toml --no-default-features
+
+  test-no-std:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+            target: thumbv6m-none-eabi
+      - name: Build top-level only
+        run: cargo build --target=thumbv6m-none-eabi --no-default-features
+
+  # Disabled due to lack of known working compiler versions (not older than our MSRV)
+  # test-avr:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Install toolchain
+  #       uses: dtolnay/rust-toolchain@nightly
+  #       with:
+  #           components: rust-src
+  #     - name: Build top-level only
+  #       run: cargo build -Z build-std=core --target=avr-unknown-gnu-atmega328 --no-default-features
+
+  test-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+            target: aarch64-apple-ios
+      - name: Build top-level only
+        run: cargo build --target=aarch64-apple-ios
