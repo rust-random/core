@@ -18,7 +18,7 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
-  # Source: https://medium.com/@usman_qb
+  # Source: https://medium.com/@usman_qb/9cfcad1b13c4
   release:
     runs-on: ubuntu-latest
     steps:
