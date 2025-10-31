@@ -1,4 +1,4 @@
-name: Make releases from tags
+name: Publish to crates.io and create GitHub release
 on:
   push:
     tags: ['v*']
@@ -22,12 +22,12 @@ jobs:
     - name: Create release body
       id: create_release_body
       run: |
-        RELEASEVERSION="[${{ github.ref_name.slice(1) }}]"
-        echo "Version: $RELEASEVERSION"
-        RELEASEBODY=$(awk -v ver="$RELEASEVERSION" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p && NF' CHANGELOG.md)
+        RELEASE_VERSION="${{ github.ref_name.slice }}"
+        echo "Version: $RELEASE_VERSION"
+        RELEASE_BODY=$(awk -v ver="[${RELEASE_VERSION:1}]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p && NF' CHANGELOG.md)
         {
-        echo 'RELEASEBODY<<EOF'
-        echo "${RELEASEBODY}"
+        echo 'RELEASE_BODY<<EOF'
+        echo "${RELEASE_BODY}"
         echo EOF
         } >> $GITHUB_OUTPUT
 
@@ -36,6 +36,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "Creating release for ${{ github.ref_name }}"
-        echo "${{ steps.create_release_body.outputs.RELEASEBODY }}"
-        gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "${{ steps.create_release_body.outputs.RELEASEBODY }}"
+        echo "${{ steps.create_release_body.outputs.RELEASE_BODY }}"
+        gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "${{ steps.create_release_body.outputs.RELEASE_BODY }}"
         echo "Release created successfully"
