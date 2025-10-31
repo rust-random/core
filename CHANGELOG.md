@@ -1,10 +1,10 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.10.0] - Unreleased
 ### API changes
 - Relax `Sized` bound on impls of `SeedableRng` (#1641)
 - Move `rand_core::impls::*` to `rand_core::le` module (#1667)
@@ -14,19 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove feature `std` (#1674)
 - Removed dependency `getrandom` (#1674)
 
-## [0.9.3] — 2025-02-29
+[0.10.0]: https://github.com/rust-random/core/compare/v0.9.3...HEAD
+
+## [0.9.3] - 2025-02-29
 ### Other
 - Remove `zerocopy` dependency (#1607)
 - Deprecate `rand_core::impls::fill_via_u32_chunks`, `fill_via_u64_chunks` (#1607)
+
+[0.9.3]: https://github.com/rust-random/core/compare/v0.9.2...v0.9.3
 
 ## [0.9.2] - 2025-02-22
 ### API changes
 - Relax `Sized` bound on impls of `TryRngCore`, `TryCryptoRng` and `UnwrapMut` (#1593)
 - Add `UnwrapMut::re` to reborrow the inner rng with a tighter lifetime (#1595)
 
+[0.9.2]: https://github.com/rust-random/core/compare/v0.9.1...v0.9.2
+
 ## [0.9.1] - 2025-02-16
 ### API changes
 - Add `TryRngCore::unwrap_mut`, providing an impl of `RngCore` over `&mut rng` (#1589)
+
+[0.9.1]: https://github.com/rust-random/core/compare/v0.9.0...v0.9.1
 
 ## [0.9.0] - 2025-01-27
 ### Dependencies and features
@@ -45,20 +53,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename `fn SeedableRng::from_entropy` -> `from_os_rng` and add fallible variant `fn try_from_os_rng` (#1424)
 - Add bounds `Clone` and `AsRef` to associated type `SeedableRng::Seed` (#1491)
 
+[0.9.0]: https://github.com/rust-random/core/compare/v0.6.4...v0.9.0
+
 ## [0.6.4] - 2022-09-15
 - Fix unsoundness in `<BlockRng64 as RngCore>::next_u32` (#1160)
 - Reduce use of `unsafe` and improve gen_bytes performance (#1180)
 - Add `CryptoRngCore` trait (#1187, #1230)
+
+[0.6.4]: https://github.com/rust-random/core/compare/v0.6.3...v0.6.4
 
 ## [0.6.3] - 2021-06-15
 ### Changed
 - Improved bound for `serde` impls on `BlockRng` (#1130)
 - Minor doc additions (#1118)
 
+[0.6.3]: https://github.com/rust-random/core/compare/v0.6.2...v0.6.3
+
 ## [0.6.2] - 2021-02-12
 ### Fixed
 - Fixed assertions in `le::read_u32_into` and `le::read_u64_into` which could
   have allowed buffers not to be fully populated (#1096)
+
+[0.6.2]: https://github.com/rust-random/core/compare/v0.6.1...v0.6.2
 
 ## [0.6.1] - 2021-01-03
 ### Fixed
@@ -66,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   multiple of four (#1082)
 ### Other
 - Enable all stable features in the playground (#1081)
+
+[0.6.1]: https://github.com/rust-random/core/compare/v0.6.0...v0.6.1
 
 ## [0.6.0] - 2020-12-08
 ### Breaking changes
@@ -81,6 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix some clippy warnings (#1036)
 - Apply rustfmt (#926)
 
+[0.6.0]: https://github.com/rust-random/core/compare/v0.5.1...v0.6.0
+
 ## [0.5.1] - 2019-08-28
 - `OsRng` added to `rand_core` (#863)
 - `Error::INTERNAL_START` and `Error::CUSTOM_START` constants (#864)
@@ -90,23 +110,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `alloc` feature in `no_std` is available since Rust 1.36 (#856)
 - Added `#[inline]` to `Error` conversion methods (#864)
 
+[0.5.1]: https://github.com/rust-random/core/compare/v0.5.0...v0.5.1
+
 ## [0.5.0] - 2019-06-06
 ### Changed
 - Enable testing with Miri and fix incorrect pointer usages (#779, #780, #781, #783, #784)
 - Rewrite `Error` type and adjust API (#800)
 - Adjust usage of `#[inline]` for `BlockRng` and `BlockRng64`
 
+[0.5.0]: https://github.com/rust-random/core/compare/v0.4.0...v0.5.0
+
 ## [0.4.0] - 2019-01-24
 ### Changed
 - Disable the `std` feature by default (#702)
+
+[0.4.0]: https://github.com/rust-random/core/compare/v0.3.0...v0.4.0
 
 ## [0.3.0] - 2018-09-24
 ### Added
 - Add `SeedableRng::seed_from_u64` for convenient seeding. (#537)
 
+[0.3.0]: https://github.com/rust-random/core/compare/v0.2.1...v0.3.0
+
 ## [0.2.1] - 2018-06-08
 ### Added
 - References to a `CryptoRng` now also implement `CryptoRng`. (#470)
+
+[0.2.1]: https://github.com/rust-random/core/compare/v0.2.0...v0.2.1
 
 ## [0.2.0] - 2018-05-21
 ### Changed
@@ -116,6 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Add `BlockRng{64}::index` and `BlockRng{64}::generate_and_set`. (#374, #419)
 - Implement `std::io::Read` for RngCore. (#434)
+
+[0.2.0]: https://github.com/rust-random/core/compare/v0.1.0...v0.2.0
 
 ## [0.1.0] - 2018-04-17
 (Split out of the Rand crate, changes here are relative to rand 0.4.2.)
@@ -131,5 +163,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Revise the `SeedableRng` trait. (#233)
 - Remove default implementations for `RngCore::next_u64` and `RngCore::fill_bytes`. (#288)
 
-## [0.0.1] - 2017-09-14 (yanked)
-Experimental version as part of the rand crate refactor.
+[0.1.0]: https://github.com/rust-random/core/compare/v0.0.0...v0.1.0
