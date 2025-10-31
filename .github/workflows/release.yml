@@ -4,9 +4,9 @@ on:
     tags: ['v*']
 
 jobs:
+  # Source: https://crates.io/docs/trusted-publishing
   publish:
     runs-on: ubuntu-latest
-    # Source: https://crates.io/docs/trusted-publishing
     environment: release  # Optional: for enhanced security
     permissions:
       id-token: write     # Required for OIDC token exchange
@@ -18,11 +18,14 @@ jobs:
       env:
         CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
-    # Source: https://medium.com/@usman_qb
+  # Source: https://medium.com/@usman_qb
+  release:
+    runs-on: ubuntu-latest
+    steps:
     - name: Create release body
       id: create_release_body
       run: |
-        RELEASE_VERSION="${{ github.ref_name.slice }}"
+        RELEASE_VERSION="${{ github.ref_name }}"
         echo "Version: $RELEASE_VERSION"
         RELEASE_BODY=$(awk -v ver="[${RELEASE_VERSION:1}]" '/^## / { if (p) { exit }; if ($2 == ver) { p=1; next } } p && NF' CHANGELOG.md)
         {
@@ -31,7 +34,7 @@ jobs:
         echo EOF
         } >> $GITHUB_OUTPUT
 
-    - name: Create Release
+    - name: Create GitHub release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
