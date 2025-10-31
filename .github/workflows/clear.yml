@@ -1,0 +1,16 @@
+name: Clear deployments
+on:
+  pull_request:
+    branches: "master"
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions: write-all
+    steps:
+      - name: Delete deployment
+        uses: strumwolf/delete-deployment-environment@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: release
+          onlyRemoveDeployments: true
