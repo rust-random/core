@@ -6,12 +6,12 @@ on:
     branches: 'master'
 
 jobs:
-
-
   # Source: https://medium.com/@usman_qb
   release:
     runs-on: ubuntu-latest
     steps:
+    - run: ls
+    - run: cat CHANGELOG.md
     - name: Create release body
       id: create_release_body
       run: |
