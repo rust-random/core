@@ -7,9 +7,9 @@ jobs:
   # Source: https://crates.io/docs/trusted-publishing
   publish:
     runs-on: ubuntu-latest
-    environment: release  # Optional: for enhanced security
+    environment: release
     permissions:
-      id-token: write     # Required for OIDC token exchange
+      id-token: write
     steps:
     - uses: actions/checkout@v5
     - uses: rust-lang/crates-io-auth-action@v1
@@ -22,7 +22,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-    - name: Create release body
+    - uses: actions/checkout@v5
+    - name: Generate release body
       id: create_release_body
       run: |
         RELEASE_VERSION="${{ github.ref_name }}"
@@ -33,7 +34,6 @@ jobs:
         echo "${RELEASE_BODY}"
         echo EOF
         } >> $GITHUB_OUTPUT
-
     - name: Create GitHub release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
