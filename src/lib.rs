@@ -488,6 +488,34 @@ pub trait SeedableRng: Sized {
         rng.try_fill_bytes(seed.as_mut())?;
         Ok(Self::from_seed(seed))
     }
+
+    /// Fork this PRNG
+    ///
+    /// This creates a new PRNG from the current one by initializing a new one and
+    /// seeding it from the current one.
+    ///
+    /// This is useful when initializing a PRNG for a thread
+    fn fork(&mut self) -> Self
+    where
+        Self: RngCore,
+    {
+        Self::from_rng(self)
+    }
+
+    /// Fork this PRNG
+    ///
+    /// This creates a new PRNG from the current one by initializing a new one and
+    /// seeding it from the current one.
+    ///
+    /// This is useful when initializing a PRNG for a thread.
+    ///
+    /// This is the failable equivalent to [`SeedableRng::fork`]
+    fn try_fork(&mut self) -> Result<Self, Self::Error>
+    where
+        Self: TryRngCore,
+    {
+        Self::try_from_rng(self)
+    }
 }
 
 #[cfg(test)]

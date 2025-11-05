@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove feature `os_rng`, structs `OsRng` and `OsError` and fns `from_os_rng`, `try_from_os_rng` ([#1674])
 - Remove feature `std` ([#1674])
 - Removed dependency `getrandom` ([#1674])
+- Add `SeedableRng::fork` methods ([#17])
 ### Other
 - Changed repository from [rust-random/rand] to [rust-random/core].
 
@@ -23,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [#1668]: https://github.com/rust-random/rand/pull/1668
 [#1669]: https://github.com/rust-random/rand/pull/1669
 [#1674]: https://github.com/rust-random/rand/pull/1674
+[#17]: https://github.com/rust-random/rand-core/pull/17
 
 [rust-random/rand]: https://github.com/rust-random/rand
 [rust-random/core]: https://github.com/rust-random/core
