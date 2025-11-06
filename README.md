@@ -3,7 +3,6 @@
 [![Test Status](https://github.com/rust-random/rand_core/actions/workflows/test.yml/badge.svg?event=push)](https://github.com/rust-random/rand_core/actions)
 [![Latest version](https://img.shields.io/crates/v/rand_core.svg)](https://crates.io/crates/rand_core)
 [![Book](https://img.shields.io/badge/book-master-yellow.svg)](https://rust-random.github.io/book/)
-[![API](https://img.shields.io/badge/api-master-yellow.svg)](https://rust-random.github.io/rand/rand_core)
 [![API](https://docs.rs/rand_core/badge.svg)](https://docs.rs/rand_core)
 
 Core traits and error types of the [rand] library, plus tools for implementing
@@ -21,9 +20,8 @@ prefer to use the main [rand] crate.
 
 Links:
 
--   [API documentation (master)](https://rust-random.github.io/rand/rand_core)
 -   [API documentation (docs.rs)](https://docs.rs/rand_core)
--   [Changelog](https://github.com/rust-random/rand/blob/master/rand_core/CHANGELOG.md)
+-   [Changelog](https://github.com/rust-random/rand_core/blob/master/CHANGELOG.md)
 
 [rand]: https://crates.io/crates/rand
 
