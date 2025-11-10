@@ -59,19 +59,20 @@
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         for byte in dst {
-//!             self.0 += 1;
-//!             *byte = self.0;
+//!             let val = self.0;
+//!             self.0 = val + 1;
+//!             *byte = val;
 //!         }
 //!     }
 //! }
 //!
 //! let mut rng = FillRng(0);
 //!
-//! assert_eq!(rng.next_u32(), 0x0403_0201);
-//! assert_eq!(rng.next_u64(), 0x0c0b_0a09_0807_0605);
-//! let mut buf = [0u8; 4];
+//! assert_eq!(rng.next_u32(), 0x03_020100);
+//! assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
+//! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x0d, 0x0e, 0x0f, 0x10]);
+//! assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
 //! ```
 //!
 //! ## Single 32-bit value RNG
@@ -83,8 +84,9 @@
 //!
 //! impl RngCore for Step32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         self.0 += 1;
-//!         self.0
+//!         let val = self.0;
+//!         self.0 = val + 1;
+//!         val
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
@@ -98,11 +100,11 @@
 //!
 //! let mut rng = Step32Rng(0);
 //!
-//! assert_eq!(rng.next_u32(), 1);
-//! assert_eq!(rng.next_u64(), 0x0000_0003_0000_0002);
-//! let mut buf = [0u8; 4];
+//! assert_eq!(rng.next_u32(), 0);
+//! assert_eq!(rng.next_u64(), 0x0000_0002_0000_0001);
+//! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [4, 0, 0, 0]);
+//! assert_eq!(buf, [3, 0, 0, 0, 4]);
 //! ```
 //!
 //! ## Single 64-bit value RNG
@@ -118,8 +120,9 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         self.0 += 1;
-//!         self.0
+//!         let val = self.0;
+//!         self.0 = val + 1;
+//!         val
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
@@ -129,11 +132,11 @@
 //!
 //! let mut rng = Step64Rng(0);
 //!
-//! assert_eq!(rng.next_u32(), 1);
-//! assert_eq!(rng.next_u64(), 2);
-//! let mut buf = [0u8; 4];
+//! assert_eq!(rng.next_u32(), 0);
+//! assert_eq!(rng.next_u64(), 1);
+//! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [3, 0, 0, 0]);
+//! assert_eq!(buf, [2, 0, 0, 0, 0]);
 //! ```
 //!
 //! ## 32-bit block RNG
@@ -145,8 +148,9 @@
 //!
 //! impl Block32RngCore {
 //!     fn next_block(&mut self) -> [u32; 8] {
-//!         self.0.iter_mut().for_each(|v| *v += 1);
-//!         self.0
+//!         let val = self.0;
+//!         self.0 = val.map(|v| v + 1);
+//!         val
 //!     }
 //! }
 //!
@@ -184,11 +188,11 @@
 //!
 //! let mut rng = Block32Rng::seed_from_u64(42);
 //!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa5);
-//! assert_eq!(rng.next_u64(), 0xcca1_b8eb_0a3d_3259);
-//! let mut buf = [0u8; 4];
+//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! assert_eq!(rng.next_u64(), 0xcca1_b8ea_0a3d_3258);
+//! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x6a, 0x01, 0x14, 0xb8]);
+//! assert_eq!(buf, [0x69, 0x01, 0x14, 0xb8, 0x2b]);
 //! ```
 //!
 //! ## 64-bit block RNG
@@ -200,8 +204,9 @@
 //!
 //! impl Block64RngCore {
 //!     fn next_block(&mut self) -> [u64; 4] {
-//!         self.0.iter_mut().for_each(|v| *v += 1);
-//!         self.0
+//!         let val = self.0;
+//!         self.0 = val.map(|v| v + 1);
+//!         val
 //!     }
 //! }
 //!
@@ -239,11 +244,11 @@
 //!
 //! let mut rng = Block64Rng::seed_from_u64(42);
 //!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa5);
-//! assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8eb);
-//! let mut buf = [0u8; 4];
+//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
+//! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x2c, 0x8c, 0xc8, 0x75]);
+//! assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
 //! ```
 
 use crate::RngCore;
