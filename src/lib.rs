@@ -72,7 +72,7 @@ pub mod utils;
 ///
 /// Typically an RNG will implement only one of the methods available
 /// in this trait directly, then use the helper functions from the
-/// [`le` module](crate::le) to implement the other methods.
+/// [`utils`] module to implement the other methods.
 ///
 /// Note that implementors of [`RngCore`] also automatically implement
 /// the [`TryRngCore`] trait with the `Error` associated type being
