@@ -12,7 +12,8 @@
 //! # Implementing [`SeedableRng`]
 //!
 //! In many cases, [`SeedableRng::Seed`] must be converted to `[u32]` or `[u64]`.
-//! We provide [`read_u32_into`] and [`read_u64_into`] helpers for this.
+//! We provide the [`read_words_into`] helper function for this. The examples below
+//! demonstrate how it can be used in practice.
 //!
 //! [`SeedableRng`]: crate::SeedableRng
 //! [`SeedableRng::Seed`]: crate::SeedableRng::Seed
@@ -27,10 +28,12 @@
 //! i.e. if optimal block size depends on available target features, we reccomend to always
 //! generate the biggest supported block size.
 //!
-//! See the examples below which demonstrate how functions in this module can be used to implement
-//! `RngCore` for common RNG algorithm classes.
+//! # Examples
 //!
-//! WARNING: the RNG implementations below are provided for demonstation purposes only and
+//! The examples below demonstrate how functions in this module can be used to implement
+//! [`RngCore`] and [`SeedableRng`] for common RNG algorithm classes.
+//!
+//! WARNING: the step RNG implementations below are provided for demonstation purposes only and
 //! should not be used in practice!
 //!
 //! ## Single 32-bit value RNG
@@ -102,34 +105,34 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, utils};
 //!
-//! struct Block32RngCore([u32; 8]);
+//! struct Step8x32RngCore([u32; 8]);
 //!
-//! impl Block32RngCore {
+//! impl Step8x32RngCore {
 //!     fn next_block(&mut self, block: &mut [u32; 8]) {
 //!         *block = self.0;
 //!         self.0.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
-//! pub struct Block32Rng {
-//!     core: Block32RngCore,
+//! pub struct Step8x32Rng {
+//!     core: Step8x32RngCore,
 //!     buffer: [u32; 8],
 //! }
 //!
-//! impl SeedableRng for Block32Rng {
+//! impl SeedableRng for Step8x32Rng {
 //!     type Seed = [u8; 32];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u32; 8];
 //!         utils::read_words_into(&seed, &mut core_state);
 //!         Self {
-//!             core: Block32RngCore(core_state),
+//!             core: Step8x32RngCore(core_state),
 //!             buffer: utils::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
-//! impl RngCore for Block32Rng {
+//! impl RngCore for Step8x32Rng {
 //!     fn next_u32(&mut self) -> u32 {
 //!         utils::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
 //!     }
@@ -143,7 +146,7 @@
 //!     }
 //! }
 //!
-//! let mut rng = Block32Rng::seed_from_u64(42);
+//! let mut rng = Step8x32Rng::seed_from_u64(42);
 //!
 //! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
 //! assert_eq!(rng.next_u64(), 0xcca1_b8ea_0a3d_3258);
@@ -157,34 +160,34 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, utils};
 //!
-//! struct Block64RngCore([u64; 4]);
+//! struct Step4x64RngCore([u64; 4]);
 //!
-//! impl Block64RngCore {
+//! impl Step4x64RngCore {
 //!     fn next_block(&mut self, block: &mut [u64; 4]) {
 //!         *block = self.0;
 //!         self.0.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
-//! pub struct Block64Rng {
-//!     core: Block64RngCore,
+//! pub struct Step4x64Rng {
+//!     core: Step4x64RngCore,
 //!     buffer: [u64; 4],
 //! }
 //!
-//! impl SeedableRng for Block64Rng {
+//! impl SeedableRng for Step4x64Rng {
 //!     type Seed = [u8; 32];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u64; 4];
 //!         utils::read_words_into(&seed, &mut core_state);
 //!         Self {
-//!             core: Block64RngCore(core_state),
+//!             core: Step4x64RngCore(core_state),
 //!             buffer: utils::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
-//! impl RngCore for Block64Rng {
+//! impl RngCore for Step4x64Rng {
 //!     fn next_u32(&mut self) -> u32 {
 //!         self.next_u64() as u32
 //!     }
@@ -198,7 +201,7 @@
 //!     }
 //! }
 //!
-//! let mut rng = Block64Rng::seed_from_u64(42);
+//! let mut rng = Step4x64Rng::seed_from_u64(42);
 //!
 //! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
 //! assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
