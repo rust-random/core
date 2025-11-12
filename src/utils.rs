@@ -36,17 +36,21 @@
 //! ## Fill-based RNG
 //!
 //! ```
-//! use rand_core::{RngCore, utils};
+//! use rand_core::RngCore;
 //!
 //! pub struct FillRng(u8);
 //!
 //! impl RngCore for FillRng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         utils::next_u32_via_fill(self)
+//!         let mut buf = [0; 4];
+//!         self.fill_bytes(&mut buf);
+//!         u32::from_le_bytes(buf)
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         utils::next_u64_via_fill(self)
+//!         let mut buf = [0; 8];
+//!         self.fill_bytes(&mut buf);
+//!         u64::from_le_bytes(buf)
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
@@ -66,6 +70,9 @@
 //! rng.fill_bytes(&mut buf);
 //! assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
 //! ```
+//!
+//! Note that you can use `from_ne_bytes` instead of `from_le_bytes`
+//! if your `fill_bytes` implementation is not reproducible.
 //!
 //! ## Single 32-bit value RNG
 //!
@@ -275,20 +282,6 @@ pub fn fill_bytes_via_next<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
         let chunk: [u8; 4] = rng.next_u32().to_le_bytes();
         left.copy_from_slice(&chunk[..n]);
     }
-}
-
-/// Implement `next_u32` via `fill_bytes`, little-endian order.
-pub fn next_u32_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u32 {
-    let mut buf = [0; 4];
-    rng.fill_bytes(&mut buf);
-    u32::from_le_bytes(buf)
-}
-
-/// Implement `next_u64` via `fill_bytes`, little-endian order.
-pub fn next_u64_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
-    let mut buf = [0; 8];
-    rng.fill_bytes(&mut buf);
-    u64::from_le_bytes(buf)
 }
 
 /// Fills `dst: &mut [u32]` from `src`.
