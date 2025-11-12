@@ -309,7 +309,12 @@ pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
 }
 
 /// Create new block buffer.
+///
+/// # Panics
+/// If `N` is smaller than 2 or bigger than 2^32 - 1.
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
+    assert!(N > 2);
+    assert!(N < 1 << 32);
     let mut res = [W::from_usize(0); N];
     res[0] = W::from_usize(N);
     res
