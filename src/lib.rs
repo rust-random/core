@@ -29,6 +29,7 @@
 
 use core::{fmt, ops::DerefMut};
 
+mod sealed;
 pub mod utils;
 
 /// Implementation-level interface for RNGs
@@ -520,7 +521,7 @@ mod test {
 
             fn from_seed(seed: Self::Seed) -> Self {
                 let mut x = [0u64; 1];
-                utils::read_u64_into(&seed, &mut x);
+                utils::read_words_into(&seed, &mut x);
                 SeedableNum(x[0])
             }
         }

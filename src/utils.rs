@@ -52,7 +52,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_u32(self, dst);
+//!         utils::fill_bytes_via_next_word(dst, || self.next_u32());
 //!     }
 //! }
 //!
@@ -84,7 +84,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_u64(self, dst);
+//!         utils::fill_bytes_via_next_word(dst, || self.next_u64());
 //!     }
 //! }
 //!
@@ -105,10 +105,9 @@
 //! struct Block32RngCore([u32; 8]);
 //!
 //! impl Block32RngCore {
-//!     fn next_block(&mut self) -> [u32; 8] {
-//!         let val = self.0;
-//!         self.0 = val.map(|v| v + 1);
-//!         val
+//!     fn next_block(&mut self, block: &mut [u32; 8]) {
+//!         *block = self.0;
+//!         self.0.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
@@ -122,17 +121,17 @@
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u32; 8];
-//!         utils::read_u32_into(&seed, &mut core_state);
+//!         utils::read_words_into(&seed, &mut core_state);
 //!         Self {
 //!             core: Block32RngCore(core_state),
-//!             buffer: utils::new_u32_buffer(),
+//!             buffer: utils::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
 //! impl RngCore for Block32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         utils::next_u32_from_block(&mut self.buffer, || self.core.next_block())
+//!         utils::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
@@ -140,7 +139,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_u32(self, dst);
+//!         utils::fill_bytes_via_next_word(dst, || self.next_u32());
 //!     }
 //! }
 //!
@@ -161,10 +160,9 @@
 //! struct Block64RngCore([u64; 4]);
 //!
 //! impl Block64RngCore {
-//!     fn next_block(&mut self) -> [u64; 4] {
-//!         let val = self.0;
-//!         self.0 = val.map(|v| v + 1);
-//!         val
+//!     fn next_block(&mut self, block: &mut [u64; 4]) {
+//!         *block = self.0;
+//!         self.0.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
@@ -178,10 +176,10 @@
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u64; 4];
-//!         utils::read_u64_into(&seed, &mut core_state);
+//!         utils::read_words_into(&seed, &mut core_state);
 //!         Self {
 //!             core: Block64RngCore(core_state),
-//!             buffer: utils::new_u64_buffer(),
+//!             buffer: utils::new_buffer(),
 //!         }
 //!     }
 //! }
@@ -192,11 +190,11 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         utils::next_u64_from_block(&mut self.buffer, || self.core.next_block())
+//!         utils::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_u64(self, dst);
+//!         utils::fill_bytes_via_next_word(dst, || self.next_u64());
 //!     }
 //! }
 //!
@@ -252,7 +250,7 @@
 
 use crate::RngCore;
 
-/// Implement `next_u64` via `next_u32`, little-endian order.
+/// Implement `next_u64` via `next_u32` using little-endian order.
 pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     // Use LE; we explicitly generate one value before the next.
     let x = u64::from(rng.next_u32());
@@ -261,232 +259,157 @@ pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
 }
 
 /// Implement `fill_bytes` via `next_u64` using little-endian order.
-pub fn fill_bytes_via_next_u32<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
-    let mut chunks = dest.chunks_exact_mut(size_of::<u32>());
+pub fn fill_bytes_via_next_word<W: Word>(dest: &mut [u8], mut next_word: impl FnMut() -> W) {
+    let mut chunks = dest.chunks_exact_mut(size_of::<W>());
     for chunk in &mut chunks {
-        let val = rng.next_u32();
-        chunk.copy_from_slice(&val.to_le_bytes());
+        let val = next_word();
+        chunk.copy_from_slice(val.to_le_bytes().as_ref());
     }
     let rem = chunks.into_remainder();
     if !rem.is_empty() {
-        let val = rng.next_u32();
-        let rem_src = &val.to_le_bytes()[..rem.len()];
-        rem.copy_from_slice(rem_src);
+        let val = next_word().to_le_bytes();
+        rem.copy_from_slice(&val.as_ref()[..rem.len()]);
     }
 }
 
-/// Implement `fill_bytes` via `next_u64` using little-endian order.
-pub fn fill_bytes_via_next_u64<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
-    let mut chunks = dest.chunks_exact_mut(size_of::<u64>());
-    for chunk in &mut chunks {
-        let val = rng.next_u64();
-        chunk.copy_from_slice(&val.to_le_bytes());
-    }
-    let rem = chunks.into_remainder();
-    if !rem.is_empty() {
-        let val = rng.next_u64();
-        let rem_src = &val.to_le_bytes()[..rem.len()];
-        rem.copy_from_slice(rem_src);
-    }
-}
-
-/// Fills `dst: &mut [u32]` from `src`.
-///
-/// Reads use Little-Endian byte order, allowing portable reproduction of `dst`
-/// from a byte slice.
+/// Fills slice of words `dst` from byte slice `src` using little endian order.
 ///
 /// # Panics
 ///
-/// If `src.len() != 4 * dst.len()`.
+/// If `size_of_val(src) != size_of_val(dst)`.
 #[inline]
-#[track_caller]
-pub fn read_u32_into(src: &[u8], dst: &mut [u32]) {
+pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
     assert_eq!(size_of_val(src), size_of_val(dst));
-    for (out, chunk) in dst.iter_mut().zip(src.chunks_exact(4)) {
-        *out = u32::from_le_bytes(chunk.try_into().unwrap());
+    let chunks = src.chunks_exact(size_of::<W>());
+    for (out, chunk) in dst.iter_mut().zip(chunks) {
+        let Ok(bytes) = chunk.try_into() else {
+            unreachable!()
+        };
+        *out = W::from_le_bytes(bytes);
     }
 }
 
-/// Fills `dst: &mut [u64]` from `src`.
-///
-/// # Panics
-///
-/// If `src.len() != 8 * dst.len()`.
-#[inline]
-#[track_caller]
-pub fn read_u64_into(src: &[u8], dst: &mut [u64]) {
-    assert_eq!(size_of_val(src), size_of_val(dst));
-    for (out, chunk) in dst.iter_mut().zip(src.chunks_exact(8)) {
-        *out = u64::from_le_bytes(chunk.try_into().unwrap());
-    }
-}
-
-/// Create new 32-bit block buffer.
-pub fn new_u32_buffer<const N: usize>() -> [u32; N] {
-    assert!(N > 1);
-    let mut res = [0u32; N];
-    res[0] = N.try_into().unwrap();
+/// Create new block buffer.
+pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
+    let mut res = [W::from_usize(0); N];
+    res[0] = W::from_usize(N);
     res
 }
 
-/// Generate `u32` from block.
-pub fn next_u32_from_block<const N: usize>(
-    buf: &mut [u32; N],
-    mut generate_block: impl FnMut() -> [u32; N],
-) -> u32 {
-    let pos = buf[0] as usize;
+/// Implement `next_u32/u64` function using buffer and block generation closure.
+pub fn next_word_via_gen_block<W: Word, const N: usize>(
+    buf: &mut [W; N],
+    mut generate_block: impl FnMut(&mut [W; N]),
+) -> W {
+    let pos = buf[0].into_usize();
     match buf.get(pos) {
         Some(&val) => {
-            buf[0] += 1;
+            buf[0].increment();
             val
         }
         None => {
-            *buf = generate_block();
-            core::mem::replace(&mut buf[0], 1)
+            generate_block(buf);
+            core::mem::replace(&mut buf[0], W::from_usize(1))
         }
     }
 }
 
-/// Create new 64-bit block buffer.
-pub fn new_u64_buffer<const N: usize>() -> [u64; N] {
-    assert!(N > 1);
-    let mut res = [0u64; N];
-    res[0] = N.try_into().unwrap();
-    res
-}
+/// Implement `fill_bytes` using 32-bit block buffer and block generation function.
+pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
+    mut dst: &mut [u8],
+    buf: &mut [W; N],
+    mut generate_block: impl FnMut(&mut [W; N]),
+) {
+    let word_size = size_of::<W>();
 
-/// Generate `u64` from block.
-pub fn next_u64_from_block<const N: usize>(
-    buf: &mut [u64; N],
-    mut generate_block: impl FnMut() -> [u64; N],
-) -> u64 {
-    let pos = buf[0] as usize;
-    match buf.get(pos) {
-        Some(&val) => {
-            buf[0] += 1;
-            val
+    let pos = buf[0].into_usize();
+    if pos < buf.len() {
+        let buf_tail = &buf[pos..];
+        let buf_rem = size_of_val(buf_tail);
+
+        if buf_rem >= dst.len() {
+            let chunks = dst.chunks_mut(word_size);
+            let mut pos = buf[0];
+
+            for (src, dst) in buf_tail.iter().zip(chunks) {
+                let val = src.to_le_bytes();
+                dst.copy_from_slice(&val.as_ref()[..dst.len()]);
+                pos.increment();
+            }
+
+            buf[0] = pos;
+            return;
         }
-        None => {
-            *buf = generate_block();
-            core::mem::replace(&mut buf[0], 1)
+
+        let (l, r) = dst.split_at_mut(buf_rem);
+        dst = r;
+
+        let chunks = l.chunks_exact_mut(word_size);
+        for (src, dst) in buf_tail.iter().zip(chunks) {
+            let val = src.to_le_bytes();
+            dst.copy_from_slice(&val.as_ref()[..dst.len()]);
         }
     }
+
+    let mut blocks = dst.chunks_exact_mut(N * word_size);
+    let mut temp_buf = [W::from_usize(0); N];
+    for block in &mut blocks {
+        generate_block(&mut temp_buf);
+        for (chunk, word) in block.chunks_exact_mut(word_size).zip(temp_buf.iter()) {
+            chunk.copy_from_slice(word.to_le_bytes().as_ref());
+        }
+    }
+
+    let rem = blocks.into_remainder();
+    let new_pos = if rem.is_empty() {
+        W::from_usize(N)
+    } else {
+        generate_block(buf);
+        let chunks = rem.chunks_mut(word_size);
+        let mut pos = W::from_usize(0);
+
+        for (src, dst) in buf.iter().zip(chunks) {
+            let val = src.to_le_bytes();
+            dst.copy_from_slice(&val.as_ref()[..dst.len()]);
+            pos.increment();
+        }
+
+        pos
+    };
+    buf[0] = new_pos;
 }
+
+/// Sealed trait implemented for `u32` and `u64`.
+pub trait Word: crate::sealed::Sealed {}
+
+impl Word for u32 {}
+impl Word for u64 {}
 
 #[cfg(test)]
 mod test {
     use super::*;
-
-    pub(crate) trait Observable: Copy {
-        type Bytes: Sized + AsRef<[u8]>;
-        fn to_le_bytes(self) -> Self::Bytes;
-    }
-    impl Observable for u32 {
-        type Bytes = [u8; 4];
-
-        fn to_le_bytes(self) -> Self::Bytes {
-            Self::to_le_bytes(self)
-        }
-    }
-    impl Observable for u64 {
-        type Bytes = [u8; 8];
-
-        fn to_le_bytes(self) -> Self::Bytes {
-            Self::to_le_bytes(self)
-        }
-    }
-
-    /// Fill dest from src
-    ///
-    /// Returns `(n, byte_len)`. `src[..n]` is consumed,
-    /// `dest[..byte_len]` is filled. `src[n..]` and `dest[byte_len..]` are left
-    /// unaltered.
-    pub(crate) fn fill_via_chunks<T: Observable>(src: &[T], dest: &mut [u8]) -> (usize, usize) {
-        let size = core::mem::size_of::<T>();
-
-        // Always use little endian for portability of results.
-
-        let mut dest = dest.chunks_exact_mut(size);
-        let mut src = src.iter();
-
-        let zipped = dest.by_ref().zip(src.by_ref());
-        let num_chunks = zipped.len();
-        zipped.for_each(|(dest, src)| dest.copy_from_slice(src.to_le_bytes().as_ref()));
-
-        let byte_len = num_chunks * size;
-        if let Some(src) = src.next() {
-            // We have consumed all full chunks of dest, but not src.
-            let dest = dest.into_remainder();
-            let n = dest.len();
-            if n > 0 {
-                dest.copy_from_slice(&src.to_le_bytes().as_ref()[..n]);
-                return (num_chunks + 1, byte_len + n);
-            }
-        }
-        (num_chunks, byte_len)
-    }
-
-    #[test]
-    fn test_fill_via_u32_chunks() {
-        let src_orig = [1u32, 2, 3];
-
-        let src = src_orig;
-        let mut dst = [0u8; 11];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (3, 11));
-        assert_eq!(dst, [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 13];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (3, 12));
-        assert_eq!(dst, [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 5];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 5));
-        assert_eq!(dst, [1, 0, 0, 0, 2]);
-    }
-
-    #[test]
-    fn test_fill_via_u64_chunks() {
-        let src_orig = [1u64, 2];
-
-        let src = src_orig;
-        let mut dst = [0u8; 11];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 11));
-        assert_eq!(dst, [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 17];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 16));
-        assert_eq!(dst, [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 5];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (1, 5));
-        assert_eq!(dst, [1, 0, 0, 0, 0]);
-    }
 
     #[test]
     fn test_read() {
         let bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
         let mut buf = [0u32; 4];
-        read_u32_into(&bytes, &mut buf);
+        read_words_into(&bytes, &mut buf);
         assert_eq!(buf[0], 0x04030201);
         assert_eq!(buf[3], 0x100F0E0D);
 
         let mut buf = [0u32; 3];
-        read_u32_into(&bytes[1..13], &mut buf); // unaligned
+        read_words_into(&bytes[1..13], &mut buf); // unaligned
         assert_eq!(buf[0], 0x05040302);
         assert_eq!(buf[2], 0x0D0C0B0A);
 
         let mut buf = [0u64; 2];
-        read_u64_into(&bytes, &mut buf);
+        read_words_into(&bytes, &mut buf);
         assert_eq!(buf[0], 0x0807060504030201);
         assert_eq!(buf[1], 0x100F0E0D0C0B0A09);
 
         let mut buf = [0u64; 1];
-        read_u64_into(&bytes[7..15], &mut buf); // unaligned
+        read_words_into(&bytes[7..15], &mut buf); // unaligned
         assert_eq!(buf[0], 0x0F0E0D0C0B0A0908);
     }
 }
