@@ -33,47 +33,6 @@
 //! WARNING: the RNG implementations below are provided for demonstation purposes only and
 //! should not be used in practice!
 //!
-//! ## Fill-based RNG
-//!
-//! ```
-//! use rand_core::RngCore;
-//!
-//! pub struct FillRng(u8);
-//!
-//! impl RngCore for FillRng {
-//!     fn next_u32(&mut self) -> u32 {
-//!         let mut buf = [0; 4];
-//!         self.fill_bytes(&mut buf);
-//!         u32::from_le_bytes(buf)
-//!     }
-//!
-//!     fn next_u64(&mut self) -> u64 {
-//!         let mut buf = [0; 8];
-//!         self.fill_bytes(&mut buf);
-//!         u64::from_le_bytes(buf)
-//!     }
-//!
-//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         for byte in dst {
-//!             let val = self.0;
-//!             self.0 = val + 1;
-//!             *byte = val;
-//!         }
-//!     }
-//! }
-//!
-//! let mut rng = FillRng(0);
-//!
-//! assert_eq!(rng.next_u32(), 0x03_020100);
-//! assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
-//! ```
-//!
-//! Note that you can use `from_ne_bytes` instead of `from_le_bytes`
-//! if your `fill_bytes` implementation is not reproducible.
-//!
 //! ## Single 32-bit value RNG
 //!
 //! ```
@@ -93,7 +52,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next(self, dst);
+//!         utils::fill_bytes_via_next_u32(self, dst);
 //!     }
 //! }
 //!
@@ -125,7 +84,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next(self, dst);
+//!         utils::fill_bytes_via_next_u64(self, dst);
 //!     }
 //! }
 //!
@@ -181,7 +140,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next(self, dst);
+//!         utils::fill_bytes_via_next_u32(self, dst);
 //!     }
 //! }
 //!
@@ -237,7 +196,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next(self, dst);
+//!         utils::fill_bytes_via_next_u64(self, dst);
 //!     }
 //! }
 //!
@@ -249,6 +208,47 @@
 //! rng.fill_bytes(&mut buf);
 //! assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
 //! ```
+//!
+//! ## Fill-based RNG
+//!
+//! ```
+//! use rand_core::RngCore;
+//!
+//! pub struct FillRng(u8);
+//!
+//! impl RngCore for FillRng {
+//!     fn next_u32(&mut self) -> u32 {
+//!         let mut buf = [0; 4];
+//!         self.fill_bytes(&mut buf);
+//!         u32::from_le_bytes(buf)
+//!     }
+//!
+//!     fn next_u64(&mut self) -> u64 {
+//!         let mut buf = [0; 8];
+//!         self.fill_bytes(&mut buf);
+//!         u64::from_le_bytes(buf)
+//!     }
+//!
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         for byte in dst {
+//!             let val = self.0;
+//!             self.0 = val + 1;
+//!             *byte = val;
+//!         }
+//!     }
+//! }
+//!
+//! let mut rng = FillRng(0);
+//!
+//! assert_eq!(rng.next_u32(), 0x03_020100);
+//! assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
+//! let mut buf = [0u8; 5];
+//! rng.fill_bytes(&mut buf);
+//! assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
+//! ```
+//!
+//! Note that you can use `from_ne_bytes` instead of `from_le_bytes`
+//! if your `fill_bytes` implementation is not reproducible.
 
 use crate::RngCore;
 
@@ -260,27 +260,33 @@ pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     (y << 32) | x
 }
 
-/// Implement `fill_bytes` via `next_u64` and `next_u32`, little-endian order.
-///
-/// The fastest way to fill a slice is usually to work as long as possible with
-/// integers. That is why this method mostly uses `next_u64`, and only when
-/// there are 4 or less bytes remaining at the end of the slice it uses
-/// `next_u32` once.
-pub fn fill_bytes_via_next<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
-    let mut left = dest;
-    while left.len() >= 8 {
-        let (l, r) = { left }.split_at_mut(8);
-        left = r;
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        l.copy_from_slice(&chunk);
+/// Implement `fill_bytes` via `next_u64` using little-endian order.
+pub fn fill_bytes_via_next_u32<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
+    let mut chunks = dest.chunks_exact_mut(size_of::<u32>());
+    for chunk in &mut chunks {
+        let val = rng.next_u32();
+        chunk.copy_from_slice(&val.to_le_bytes());
     }
-    let n = left.len();
-    if n > 4 {
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
-    } else if n > 0 {
-        let chunk: [u8; 4] = rng.next_u32().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
+    let rem = chunks.into_remainder();
+    if !rem.is_empty() {
+        let val = rng.next_u32();
+        let rem_src = &val.to_le_bytes()[..rem.len()];
+        rem.copy_from_slice(rem_src);
+    }
+}
+
+/// Implement `fill_bytes` via `next_u64` using little-endian order.
+pub fn fill_bytes_via_next_u64<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
+    let mut chunks = dest.chunks_exact_mut(size_of::<u64>());
+    for chunk in &mut chunks {
+        let val = rng.next_u64();
+        chunk.copy_from_slice(&val.to_le_bytes());
+    }
+    let rem = chunks.into_remainder();
+    if !rem.is_empty() {
+        let val = rng.next_u64();
+        let rem_src = &val.to_le_bytes()[..rem.len()];
+        rem.copy_from_slice(rem_src);
     }
 }
 
