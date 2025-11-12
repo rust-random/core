@@ -39,9 +39,17 @@
 //! ## Single 32-bit value RNG
 //!
 //! ```
-//! use rand_core::{RngCore, utils};
+//! use rand_core::{RngCore, SeedableRng, utils};
 //!
 //! pub struct Step32Rng(u32);
+//!
+//! impl SeedableRng for Step32Rng {
+//!     type Seed = [u8; 4];
+//!
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         Self(u32::from_le_bytes(seed))
+//!     }
+//! }
 //!
 //! impl RngCore for Step32Rng {
 //!     fn next_u32(&mut self) -> u32 {
@@ -59,21 +67,29 @@
 //!     }
 //! }
 //!
-//! let mut rng = Step32Rng(0);
+//! let mut rng = Step32Rng::seed_from_u64(42);
 //!
-//! assert_eq!(rng.next_u32(), 0);
-//! assert_eq!(rng.next_u64(), 0x0000_0002_0000_0001);
+//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! assert_eq!(rng.next_u64(), 0x7ba1_8fa6_7ba1_8fa5);
 //! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [3, 0, 0, 0, 4]);
+//! assert_eq!(buf, [0xa7, 0x8f, 0xa1, 0x7b, 0xa8]);
 //! ```
 //!
 //! ## Single 64-bit value RNG
 //!
 //! ```
-//! use rand_core::{RngCore, utils};
+//! use rand_core::{RngCore, SeedableRng, utils};
 //!
 //! pub struct Step64Rng(u64);
+//!
+//! impl SeedableRng for Step64Rng {
+//!     type Seed = [u8; 8];
+//!
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         Self(u64::from_le_bytes(seed))
+//!     }
+//! }
 //!
 //! impl RngCore for Step64Rng {
 //!     fn next_u32(&mut self) -> u32 {
@@ -91,13 +107,13 @@
 //!     }
 //! }
 //!
-//! let mut rng = Step64Rng(0);
+//! let mut rng = Step64Rng::seed_from_u64(42);
 //!
-//! assert_eq!(rng.next_u32(), 0);
-//! assert_eq!(rng.next_u64(), 1);
+//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! assert_eq!(rng.next_u64(), 0x0a3d_3258_7ba1_8fa5);
 //! let mut buf = [0u8; 5];
 //! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [2, 0, 0, 0, 0]);
+//! assert_eq!(buf, [0xa6, 0x8f, 0xa1, 0x7b, 0x58]);
 //! ```
 //!
 //! ## 32-bit block RNG
@@ -317,7 +333,7 @@ pub fn next_word_via_gen_block<W: Word, const N: usize>(
     }
 }
 
-/// Implement `fill_bytes` using 32-bit block buffer and block generation function.
+/// Implement `fill_bytes` using buffer and block generation closure.
 pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
     mut dst: &mut [u8],
     buf: &mut [W; N],
