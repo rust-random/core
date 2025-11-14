@@ -1,6 +1,7 @@
 /// Sealed trait implemented for `u32` and `u64`.
 pub trait Sealed: Default + Copy + TryFrom<usize> {
     type Bytes: Sized + AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>;
+    const MAX: Self;
 
     fn from_usize(val: usize) -> Self;
     fn into_usize(self) -> usize;
@@ -11,6 +12,7 @@ pub trait Sealed: Default + Copy + TryFrom<usize> {
 
 impl Sealed for u32 {
     type Bytes = [u8; 4];
+    const MAX: Self = u32::MAX;
 
     fn from_usize(val: usize) -> Self {
         val.try_into().unwrap()
@@ -31,6 +33,7 @@ impl Sealed for u32 {
 
 impl Sealed for u64 {
     type Bytes = [u8; 8];
+    const MAX: Self = u64::MAX;
 
     fn from_usize(val: usize) -> Self {
         val.try_into().unwrap()
