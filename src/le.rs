@@ -172,7 +172,8 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         le::next_u64_via_u32(self)
+//!         let Self { inner, buffer } = self;
+//!         le::next_u64_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
@@ -373,6 +374,34 @@ pub fn next_word_via_gen_block<W: Word, const N: usize>(
             core::mem::replace(&mut buf[0], W::from_usize(1))
         }
     }
+}
+
+/// Implement `next_u64` function using buffer and block generation closure.
+#[inline]
+pub fn next_u64_via_gen_block<const N: usize>(
+    buf: &mut [u32; N],
+    mut generate_block: impl FnMut(&mut [u32; N]),
+) -> u64 {
+    use core::mem::replace;
+    let pos = usize::try_from(buf[0]).unwrap();
+
+    let (x, y) = if pos < N - 1 {
+        let xy = (buf[pos], buf[pos + 1]);
+        buf[0] += 2;
+        xy
+    } else if pos == N - 1 {
+        let x = buf[pos];
+        generate_block(buf);
+        let y = replace(&mut buf[0], 1);
+        (x, y)
+    } else {
+        generate_block(buf);
+        let x = replace(&mut buf[0], 2);
+        let y = buf[1];
+        (x, y)
+    };
+
+    u64::from(y) << 32 | u64::from(x)
 }
 
 /// Implement `fill_bytes` using buffer and block generation closure.
