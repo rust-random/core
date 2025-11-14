@@ -359,22 +359,25 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
         let buf_rem = size_of_val(buf_tail);
 
         if buf_rem >= dst.len() {
-            let new_pos = read_bytes(&buf, dst, pos);
+            let new_pos = read_bytes(buf, dst, pos);
             buf[0] = new_pos;
             return;
         }
 
         let (l, r) = dst.split_at_mut(buf_rem);
-        read_bytes(&buf, l, pos);
+        read_bytes(buf, l, pos);
         dst = r;
     }
 
     let mut blocks = dst.chunks_exact_mut(N * word_size);
     let zero = W::from_usize(0);
-    let mut temp_buf = [zero; N];
     for block in &mut blocks {
-        generate_block(&mut temp_buf);
-        read_bytes(&temp_buf, block, zero);
+        // We intentionally use the temporary buffer to prevent unnecessary writes
+        // to the original `buf` and to enable potential optimization of writing
+        // generated data directly into `block`.
+        let mut buf = [zero; N];
+        generate_block(&mut buf);
+        read_bytes(&buf, block, zero);
     }
 
     let rem = blocks.into_remainder();
@@ -382,7 +385,7 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
         W::from_usize(N)
     } else {
         generate_block(buf);
-        read_bytes::<W, N>(&buf, rem, zero)
+        read_bytes::<W, N>(buf, rem, zero)
     };
     buf[0] = new_pos;
 }
