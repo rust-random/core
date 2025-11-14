@@ -344,7 +344,7 @@ pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
 /// Create new block buffer.
 ///
 /// # Panics
-/// If `N` is smaller than 2 or can not be represented as `W`.
+/// If `N` is smaller than 3 or can not be represented as `W`.
 #[inline]
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
     assert!(N > 2);
