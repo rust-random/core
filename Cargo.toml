@@ -15,18 +15,3 @@ categories = ["algorithms", "no-std"]
 edition = "2024"
 rust-version = "1.85"
 exclude = ["/.github"]
-
-[package.metadata.docs.rs]
-# To build locally:
-# RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --no-deps --open
-all-features = true
-rustdoc-args = ["--generate-link-to-definition"]
-
-[package.metadata.playground]
-all-features = true
-
-[features]
-serde = ["dep:serde"] # enables serde for BlockRng wrapper
-
-[dependencies]
-serde = { version = "1.0.103", features = ["derive"], optional = true }
