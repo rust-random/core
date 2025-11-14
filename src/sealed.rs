@@ -12,18 +12,23 @@ pub trait Sealed: Default + Copy + TryFrom<usize> {
 impl Sealed for u32 {
     type Bytes = [u8; 4];
 
+    #[inline(always)]
     fn from_usize(val: usize) -> Self {
         val.try_into().unwrap()
     }
+    #[inline(always)]
     fn into_usize(self) -> usize {
         self.try_into().unwrap()
     }
+    #[inline(always)]
     fn to_le_bytes(self) -> Self::Bytes {
         u32::to_le_bytes(self)
     }
+    #[inline(always)]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
         u32::from_le_bytes(bytes)
     }
+    #[inline(always)]
     fn increment(&mut self) {
         *self += 1;
     }
@@ -32,18 +37,23 @@ impl Sealed for u32 {
 impl Sealed for u64 {
     type Bytes = [u8; 8];
 
+    #[inline(always)]
     fn from_usize(val: usize) -> Self {
         val.try_into().unwrap()
     }
+    #[inline(always)]
     fn into_usize(self) -> usize {
         self.try_into().unwrap()
     }
+    #[inline(always)]
     fn to_le_bytes(self) -> Self::Bytes {
         u64::to_le_bytes(self)
     }
+    #[inline(always)]
     fn from_le_bytes(bytes: Self::Bytes) -> Self {
         u64::from_le_bytes(bytes)
     }
+    #[inline(always)]
     fn increment(&mut self) {
         *self += 1;
     }

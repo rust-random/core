@@ -270,6 +270,7 @@
 use crate::RngCore;
 
 /// Implement `next_u64` via `next_u32` using little-endian order.
+#[inline]
 pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     // Use LE; we explicitly generate one value before the next.
     let x = u64::from(rng.next_u32());
@@ -278,6 +279,7 @@ pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
 }
 
 /// Implement `fill_bytes` via `next_u64` using little-endian order.
+#[inline]
 pub fn fill_bytes_via_next_word<W: Word>(dest: &mut [u8], mut next_word: impl FnMut() -> W) {
     let mut chunks = dest.chunks_exact_mut(size_of::<W>());
     for chunk in &mut chunks {
@@ -312,6 +314,7 @@ pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
 ///
 /// # Panics
 /// If `N` is smaller than 2 or can not be represented as `W`.
+#[inline]
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
     assert!(N > 2);
     // Check that `N` can be converted into `W`.
@@ -322,6 +325,7 @@ pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
 }
 
 /// Implement `next_u32/u64` function using buffer and block generation closure.
+#[inline]
 pub fn next_word_via_gen_block<W: Word, const N: usize>(
     buf: &mut [W; N],
     mut generate_block: impl FnMut(&mut [W; N]),
@@ -340,6 +344,7 @@ pub fn next_word_via_gen_block<W: Word, const N: usize>(
 }
 
 /// Implement `fill_bytes` using buffer and block generation closure.
+#[inline]
 pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
     mut dst: &mut [u8],
     buf: &mut [W; N],
@@ -387,7 +392,8 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
 ///
 /// This function is written in a way which helps the compiler to compile it down
 /// to one `memcpy`. The temporary buffer gets eliminated by the compiler, see:
-/// https://rust.godbolt.org/z/Kaq7zbsT3
+/// https://rust.godbolt.org/z/xbo88cbsn
+#[inline]
 fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -> W {
     let word_size = size_of::<W>();
     let pos = pos.into_usize();
