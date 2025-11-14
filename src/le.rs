@@ -349,8 +349,6 @@ pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
 #[inline]
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
     assert!(N > 2);
-    // Check that `N` can be converted into `W`.
-    let _ = W::from_usize(N);
     let mut res = [W::from_usize(0); N];
     res[0] = W::from_usize(N);
     res
