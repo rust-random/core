@@ -47,6 +47,7 @@
 //!     type Seed = [u8; 4];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
+//!         // Always use Little-Endian conversion to ensure portable results
 //!         Self(u32::from_le_bytes(seed))
 //!     }
 //! }
