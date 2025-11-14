@@ -23,10 +23,13 @@
 //! Usually an implementation of [`RngCore`] will implement one of the three methods
 //! over its internal source, while remaining methods are implemented on top of it.
 //!
-//! Additionally, some RNGs generate blocks of data. In that case the implementations have to
-//! handle buffering of the generated block. If an implementation supports SIMD-based optimizations,
-//! i.e. if optimal block size depends on available target features, we reccomend to always
-//! generate the biggest supported block size.
+//! Some RNGs instead generate fixed-size blocks of data. In this case the implementations must
+//! handle buffering of the generated blocks.
+//!
+//! If an implementation can generate several blocks simultaneously (e.g. using SIMD), we recommend
+//! to treat multiple generated blocks as one big block (i.e. you should treat `[[u32; N]; M]`
+//! as `[u32; N * M]`). If number of simultaneously generated blocks depends on target features,
+//! we recommend to use the largest supported number of blocks for all target features.
 //!
 //! # Examples
 //!
