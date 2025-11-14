@@ -154,7 +154,8 @@
 //!
 //! impl RngCore for Step8x32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         le::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
+//!         let Self { buffer, core } = self;
+//!         le::next_word_via_gen_block(buffer, |block| core.next_block(block))
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
@@ -162,7 +163,8 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         le::fill_bytes_via_next_word(dst, || self.next_u32());
+//!         let Self { buffer, core } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| core.next_block(block));
 //!     }
 //! }
 //!
@@ -222,11 +224,13 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         le::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
+//!         let Self { buffer, core } = self;
+//!         le::next_word_via_gen_block(buffer, |block| core.next_block(block))
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         le::fill_bytes_via_next_word(dst, || self.next_u64());
+//!         let Self { buffer, core } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| core.next_block(block));
 //!     }
 //! }
 //!
