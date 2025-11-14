@@ -12,7 +12,7 @@
 //! # Implementing [`SeedableRng`]
 //!
 //! In many cases, [`SeedableRng::Seed`] must be converted to `[u32]` or `[u64]`.
-//! We provide the [`read_words_into`] helper function for this. The examples below
+//! We provide the [`read_words`] helper function for this. The examples below
 //! demonstrate how it can be used in practice.
 //!
 //! [`SeedableRng`]: crate::SeedableRng
@@ -27,39 +27,41 @@
 //! handle buffering of the generated blocks.
 //!
 //! If an implementation can generate several blocks simultaneously (e.g. using SIMD), we recommend
-//! to treat multiple generated blocks as one big block (i.e. you should treat `[[u32; N]; M]`
-//! as `[u32; N * M]`). If number of simultaneously generated blocks depends on target features,
-//! we recommend to use the largest supported number of blocks for all target features.
+//! to treat multiple generated blocks as a single large block (i.e. you should treat
+//! `[[u32; N]; M]` as `[u32; N * M]`). If the number of simultaneously generated blocks depends
+//! on CPU target features, we recommend to use the largest supported number of blocks
+//! for all target features.
 //!
 //! # Examples
 //!
 //! The examples below demonstrate how functions in this module can be used to implement
 //! [`RngCore`] and [`SeedableRng`] for common RNG algorithm classes.
 //!
-//! WARNING: the step RNG implementations below are provided for demonstation purposes only and
-//! should not be used in practice!
-//!
 //! ## Single 32-bit value RNG
 //!
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
 //!
-//! pub struct Step32Rng(u32);
+//! pub struct Step32Rng {
+//!     state: u32
+//! }
 //!
 //! impl SeedableRng for Step32Rng {
 //!     type Seed = [u8; 4];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
-//!         // Always use Little-Endian conversion to ensure portable results
-//!         Self(u32::from_le_bytes(seed))
+//!         // Always use little-endian byte order to ensure portable results
+//!         let state = u32::from_le_bytes(seed);
+//!         Self { state }
 //!     }
 //! }
 //!
 //! impl RngCore for Step32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         let val = self.0;
-//!         self.0 = val + 1;
-//!         val
+//!         // ...
+//!         # let val = self.state;
+//!         # self.state = val + 1;
+//!         # val
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
@@ -71,13 +73,12 @@
 //!     }
 //! }
 //!
-//! let mut rng = Step32Rng::seed_from_u64(42);
-//!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
-//! assert_eq!(rng.next_u64(), 0x7ba1_8fa6_7ba1_8fa5);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0xa7, 0x8f, 0xa1, 0x7b, 0xa8]);
+//! # let mut rng = Step32Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0x7ba1_8fa6_7ba1_8fa5);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0xa7, 0x8f, 0xa1, 0x7b, 0xa8]);
 //! ```
 //!
 //! ## Single 64-bit value RNG
@@ -85,13 +86,17 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
 //!
-//! pub struct Step64Rng(u64);
+//! pub struct Step64Rng {
+//!     state: u64
+//! }
 //!
 //! impl SeedableRng for Step64Rng {
 //!     type Seed = [u8; 8];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
-//!         Self(u64::from_le_bytes(seed))
+//!         // Always use little-endian byte order to ensure portable results
+//!         let state = u64::from_le_bytes(seed);
+//!         Self { state }
 //!     }
 //! }
 //!
@@ -101,9 +106,10 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         let val = self.0;
-//!         self.0 = val + 1;
-//!         val
+//!         // ...
+//!         # let val = self.state;
+//!         # self.state = val + 1;
+//!         # val
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
@@ -111,13 +117,12 @@
 //!     }
 //! }
 //!
-//! let mut rng = Step64Rng::seed_from_u64(42);
-//!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
-//! assert_eq!(rng.next_u64(), 0x0a3d_3258_7ba1_8fa5);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0xa6, 0x8f, 0xa1, 0x7b, 0x58]);
+//! # let mut rng = Step64Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0x0a3d_3258_7ba1_8fa5);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0xa6, 0x8f, 0xa1, 0x7b, 0x58]);
 //! ```
 //!
 //! ## 32-bit block RNG
@@ -321,7 +326,6 @@ pub fn fill_bytes_via_next_word<W: Word>(dest: &mut [u8], mut next_word: impl Fn
 /// Reads array of words from byte slice `src` using little endian order.
 ///
 /// # Panics
-///
 /// If `size_of_val(src) != size_of::<[W; N]>()`.
 #[inline]
 pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
