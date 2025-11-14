@@ -520,8 +520,7 @@ mod test {
             type Seed = [u8; 8];
 
             fn from_seed(seed: Self::Seed) -> Self {
-                let mut x = [0u64; 1];
-                le::read_words_into(&seed, &mut x);
+                let x: [u64; 1] = le::read_words(&seed);
                 SeedableNum(x[0])
             }
         }

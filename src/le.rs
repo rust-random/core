@@ -125,37 +125,45 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
 //!
-//! struct Step8x32RngCore([u32; 8]);
+//! struct Block8x32RngInner {
+//!     // ...
+//!     # state: [u32; 8]
+//! }
 //!
-//! impl Step8x32RngCore {
+//! impl Block8x32RngInner {
+//!     fn new(seed: [u32; 8]) -> Self {
+//!         // ...
+//!         # Self { state: seed }
+//!     }
+//!
 //!     fn next_block(&mut self, block: &mut [u32; 8]) {
-//!         *block = self.0;
-//!         self.0.iter_mut().for_each(|v| *v += 1);
+//!         // ...
+//!         # *block = self.state;
+//!         # self.state.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
-//! pub struct Step8x32Rng {
-//!     core: Step8x32RngCore,
+//! pub struct Block8x32Rng {
+//!     inner: Block8x32RngInner,
 //!     buffer: [u32; 8],
 //! }
 //!
-//! impl SeedableRng for Step8x32Rng {
+//! impl SeedableRng for Block8x32Rng {
 //!     type Seed = [u8; 32];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
-//!         let mut core_state = [0u32; 8];
-//!         le::read_words_into(&seed, &mut core_state);
+//!         let seed: [u32; 8] = le::read_words(&seed);
 //!         Self {
-//!             core: Step8x32RngCore(core_state),
+//!             inner: Block8x32RngInner::new(seed),
 //!             buffer: le::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
-//! impl RngCore for Step8x32Rng {
+//! impl RngCore for Block8x32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         let Self { buffer, core } = self;
-//!         le::next_word_via_gen_block(buffer, |block| core.next_block(block))
+//!         let Self { inner, buffer } = self;
+//!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
@@ -163,18 +171,17 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         let Self { buffer, core } = self;
-//!         le::fill_bytes_via_gen_block(dst, buffer, |block| core.next_block(block));
+//!         let Self { inner, buffer } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
 //!     }
 //! }
 //!
-//! let mut rng = Step8x32Rng::seed_from_u64(42);
-//!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
-//! assert_eq!(rng.next_u64(), 0xcca1_b8ea_0a3d_3258);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x69, 0x01, 0x14, 0xb8, 0x2b]);
+//! # let mut rng = Block8x32Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0xcca1_b8ea_0a3d_3258);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x69, 0x01, 0x14, 0xb8, 0x2b]);
 //! ```
 //!
 //! ## 64-bit block RNG
@@ -182,12 +189,12 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
 //!
-//! struct Block64RngCore {
+//! struct Block4x64RngInner {
 //!     // ...
 //!     # state: [u64; 4],
 //! }
 //!
-//! impl Block64RngCore {
+//! impl Block4x64RngInner {
 //!     fn new(seed: [u64; 4]) -> Self {
 //!         // ...
 //!         # Self { state: seed }
@@ -200,41 +207,40 @@
 //!     }
 //! }
 //!
-//! pub struct Block64Rng {
-//!     core: Block64RngCore,
+//! pub struct Block4x64Rng {
+//!     inner: Block4x64RngInner,
 //!     buffer: [u64; 4],
 //! }
 //!
-//! impl SeedableRng for Block64Rng {
+//! impl SeedableRng for Block4x64Rng {
 //!     type Seed = [u8; 32];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
-//!         let mut seed_u64 = [0u64; 4];
-//!         le::read_words_into(&seed, &mut seed_u64);
+//!         let seed: [u64; 4] = le::read_words(&seed);
 //!         Self {
-//!             core: Block64RngCore::new(seed_u64),
+//!             inner: Block4x64RngInner::new(seed),
 //!             buffer: le::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
-//! impl RngCore for Block64Rng {
+//! impl RngCore for Block4x64Rng {
 //!     fn next_u32(&mut self) -> u32 {
 //!         self.next_u64() as u32
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         let Self { buffer, core } = self;
-//!         le::next_word_via_gen_block(buffer, |block| core.next_block(block))
+//!         let Self { inner, buffer } = self;
+//!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         let Self { buffer, core } = self;
-//!         le::fill_bytes_via_gen_block(dst, buffer, |block| core.next_block(block));
+//!         let Self { inner, buffer } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
 //!     }
 //! }
 //!
-//! # let mut rng = Block64Rng::seed_from_u64(42);
+//! # let mut rng = Block4x64Rng::seed_from_u64(42);
 //! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
 //! # assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
 //! # let mut buf = [0u8; 5];
@@ -312,14 +318,15 @@ pub fn fill_bytes_via_next_word<W: Word>(dest: &mut [u8], mut next_word: impl Fn
     }
 }
 
-/// Fills slice of words `dst` from byte slice `src` using little endian order.
+/// Reads array of words from byte slice `src` using little endian order.
 ///
 /// # Panics
 ///
-/// If `size_of_val(src) != size_of_val(dst)`.
+/// If `size_of_val(src) != size_of::<[W; N]>()`.
 #[inline]
-pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
-    assert_eq!(size_of_val(src), size_of_val(dst));
+pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
+    assert_eq!(size_of_val(src), size_of::<[W; N]>());
+    let mut dst = [W::from_usize(0); N];
     let chunks = src.chunks_exact(size_of::<W>());
     for (out, chunk) in dst.iter_mut().zip(chunks) {
         let Ok(bytes) = chunk.try_into() else {
@@ -327,6 +334,7 @@ pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
         };
         *out = W::from_le_bytes(bytes);
     }
+    dst
 }
 
 /// Create new block buffer.
@@ -459,23 +467,19 @@ mod test {
     fn test_read() {
         let bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-        let mut buf = [0u32; 4];
-        read_words_into(&bytes, &mut buf);
+        let buf: [u32; 4] = read_words(&bytes);
         assert_eq!(buf[0], 0x04030201);
         assert_eq!(buf[3], 0x100F0E0D);
 
-        let mut buf = [0u32; 3];
-        read_words_into(&bytes[1..13], &mut buf); // unaligned
+        let buf: [u32; 3] = read_words(&bytes[1..13]); // unaligned
         assert_eq!(buf[0], 0x05040302);
         assert_eq!(buf[2], 0x0D0C0B0A);
 
-        let mut buf = [0u64; 2];
-        read_words_into(&bytes, &mut buf);
+        let buf: [u64; 2] = read_words(&bytes);
         assert_eq!(buf[0], 0x0807060504030201);
         assert_eq!(buf[1], 0x100F0E0D0C0B0A09);
 
-        let mut buf = [0u64; 1];
-        read_words_into(&bytes[7..15], &mut buf); // unaligned
+        let buf: [u64; 1] = read_words(&bytes[7..15]); // unaligned
         assert_eq!(buf[0], 0x0F0E0D0C0B0A0908);
     }
 }
