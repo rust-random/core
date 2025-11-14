@@ -10,7 +10,7 @@
 //! [`SeedableRng`] is an extension trait for construction from fixed seeds and
 //! other random number generators.
 //!
-//! The [`utils`] sub-module includes a few small functions to assist
+//! The [`le`] sub-module includes a few small functions to assist
 //! implementation of [`RngCore`] and [`SeedableRng`].
 //!
 //! [`rand`]: https://docs.rs/rand
@@ -30,7 +30,7 @@
 use core::{fmt, ops::DerefMut};
 
 mod sealed;
-pub mod utils;
+pub mod le;
 
 /// Implementation-level interface for RNGs
 ///
@@ -64,7 +64,7 @@ pub mod utils;
 ///
 /// Typically an RNG will implement only one of the methods available
 /// in this trait directly, then use the helper functions from the
-/// [`utils`] module to implement the other methods.
+/// [`le`] module to implement the other methods.
 ///
 /// Note that implementors of [`RngCore`] also automatically implement
 /// the [`TryRngCore`] trait with the `Error` associated type being
@@ -521,7 +521,7 @@ mod test {
 
             fn from_seed(seed: Self::Seed) -> Self {
                 let mut x = [0u64; 1];
-                utils::read_words_into(&seed, &mut x);
+                le::read_words_into(&seed, &mut x);
                 SeedableNum(x[0])
             }
         }

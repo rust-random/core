@@ -39,7 +39,7 @@
 //! ## Single 32-bit value RNG
 //!
 //! ```
-//! use rand_core::{RngCore, SeedableRng, utils};
+//! use rand_core::{RngCore, SeedableRng, le};
 //!
 //! pub struct Step32Rng(u32);
 //!
@@ -59,11 +59,11 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         utils::next_u64_via_u32(self)
+//!         le::next_u64_via_u32(self)
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_word(dst, || self.next_u32());
+//!         le::fill_bytes_via_next_word(dst, || self.next_u32());
 //!     }
 //! }
 //!
@@ -79,7 +79,7 @@
 //! ## Single 64-bit value RNG
 //!
 //! ```
-//! use rand_core::{RngCore, SeedableRng, utils};
+//! use rand_core::{RngCore, SeedableRng, le};
 //!
 //! pub struct Step64Rng(u64);
 //!
@@ -103,7 +103,7 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_word(dst, || self.next_u64());
+//!         le::fill_bytes_via_next_word(dst, || self.next_u64());
 //!     }
 //! }
 //!
@@ -119,7 +119,7 @@
 //! ## 32-bit block RNG
 //!
 //! ```
-//! use rand_core::{RngCore, SeedableRng, utils};
+//! use rand_core::{RngCore, SeedableRng, le};
 //!
 //! struct Step8x32RngCore([u32; 8]);
 //!
@@ -140,25 +140,25 @@
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u32; 8];
-//!         utils::read_words_into(&seed, &mut core_state);
+//!         le::read_words_into(&seed, &mut core_state);
 //!         Self {
 //!             core: Step8x32RngCore(core_state),
-//!             buffer: utils::new_buffer(),
+//!             buffer: le::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
 //! impl RngCore for Step8x32Rng {
 //!     fn next_u32(&mut self) -> u32 {
-//!         utils::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
+//!         le::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         utils::next_u64_via_u32(self)
+//!         le::next_u64_via_u32(self)
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_word(dst, || self.next_u32());
+//!         le::fill_bytes_via_next_word(dst, || self.next_u32());
 //!     }
 //! }
 //!
@@ -174,7 +174,7 @@
 //! ## 64-bit block RNG
 //!
 //! ```
-//! use rand_core::{RngCore, SeedableRng, utils};
+//! use rand_core::{RngCore, SeedableRng, le};
 //!
 //! struct Step4x64RngCore([u64; 4]);
 //!
@@ -195,10 +195,10 @@
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let mut core_state = [0u64; 4];
-//!         utils::read_words_into(&seed, &mut core_state);
+//!         le::read_words_into(&seed, &mut core_state);
 //!         Self {
 //!             core: Step4x64RngCore(core_state),
-//!             buffer: utils::new_buffer(),
+//!             buffer: le::new_buffer(),
 //!         }
 //!     }
 //! }
@@ -209,11 +209,11 @@
 //!     }
 //!
 //!     fn next_u64(&mut self) -> u64 {
-//!         utils::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
+//!         le::next_word_via_gen_block(&mut self.buffer, |block| self.core.next_block(block))
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         utils::fill_bytes_via_next_word(dst, || self.next_u64());
+//!         le::fill_bytes_via_next_word(dst, || self.next_u64());
 //!     }
 //! }
 //!
