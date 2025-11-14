@@ -331,6 +331,7 @@ pub fn next_word_via_gen_block<W: Word, const N: usize>(
     mut generate_block: impl FnMut(&mut [W; N]),
 ) -> W {
     let pos = buf[0].into_usize();
+    debug_assert_ne!(pos, 0, "cursor position should not be zero");
     match buf.get(pos) {
         Some(&val) => {
             buf[0].increment();
@@ -354,6 +355,7 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
 
     let pos = buf[0];
     let pos_usize = pos.into_usize();
+    debug_assert_ne!(pos_usize, 0, "cursor position should not be zero");
     if pos_usize < buf.len() {
         let buf_tail = &buf[pos_usize..];
         let buf_rem = size_of_val(buf_tail);
