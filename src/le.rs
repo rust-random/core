@@ -176,34 +176,43 @@
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
 //!
-//! struct Step4x64RngCore([u64; 4]);
+//! struct Block64RngCore {
+//!     // ...
+//!     # state: [u64; 4],
+//! }
 //!
-//! impl Step4x64RngCore {
+//! impl Block64RngCore {
+//!     fn new(seed: [u64; 4]) -> Self {
+//!         // ...
+//!         # Self { state: seed }
+//!     }
+//!
 //!     fn next_block(&mut self, block: &mut [u64; 4]) {
-//!         *block = self.0;
-//!         self.0.iter_mut().for_each(|v| *v += 1);
+//!         // ...
+//!         # *block = self.state;
+//!         # self.state.iter_mut().for_each(|v| *v += 1);
 //!     }
 //! }
 //!
-//! pub struct Step4x64Rng {
-//!     core: Step4x64RngCore,
+//! pub struct Block64Rng {
+//!     core: Block64RngCore,
 //!     buffer: [u64; 4],
 //! }
 //!
-//! impl SeedableRng for Step4x64Rng {
+//! impl SeedableRng for Block64Rng {
 //!     type Seed = [u8; 32];
 //!
 //!     fn from_seed(seed: Self::Seed) -> Self {
-//!         let mut core_state = [0u64; 4];
-//!         le::read_words_into(&seed, &mut core_state);
+//!         let mut seed_u64 = [0u64; 4];
+//!         le::read_words_into(&seed, &mut seed_u64);
 //!         Self {
-//!             core: Step4x64RngCore(core_state),
+//!             core: Block64RngCore::new(seed_u64),
 //!             buffer: le::new_buffer(),
 //!         }
 //!     }
 //! }
 //!
-//! impl RngCore for Step4x64Rng {
+//! impl RngCore for Block64Rng {
 //!     fn next_u32(&mut self) -> u32 {
 //!         self.next_u64() as u32
 //!     }
@@ -217,13 +226,12 @@
 //!     }
 //! }
 //!
-//! let mut rng = Step4x64Rng::seed_from_u64(42);
-//!
-//! assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
-//! assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
+//! # let mut rng = Block64Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
 //! ```
 //!
 //! ## Fill-based RNG
@@ -231,7 +239,10 @@
 //! ```
 //! use rand_core::RngCore;
 //!
-//! pub struct FillRng(u8);
+//! pub struct FillRng {
+//!     // ...
+//!     # state: u8,
+//! }
 //!
 //! impl RngCore for FillRng {
 //!     fn next_u32(&mut self) -> u32 {
@@ -247,21 +258,21 @@
 //!     }
 //!
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
-//!         for byte in dst {
-//!             let val = self.0;
-//!             self.0 = val + 1;
-//!             *byte = val;
-//!         }
+//!         // ...
+//!         # for byte in dst {
+//!         #     let val = self.state;
+//!         #     self.state = val + 1;
+//!         #     *byte = val;
+//!         # }
 //!     }
 //! }
 //!
-//! let mut rng = FillRng(0);
-//!
-//! assert_eq!(rng.next_u32(), 0x03_020100);
-//! assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
-//! let mut buf = [0u8; 5];
-//! rng.fill_bytes(&mut buf);
-//! assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
+//! # let mut rng = FillRng { state: 0 };
+//! # assert_eq!(rng.next_u32(), 0x03_020100);
+//! # assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
 //! ```
 //!
 //! Note that you can use `from_ne_bytes` instead of `from_le_bytes`
