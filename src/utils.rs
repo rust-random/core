@@ -395,7 +395,7 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
 ///
 /// This function is written in a way which helps the compiler to compile it down
 /// to one `memcpy`. The temporary buffer gets eliminated by the compiler, see:
-/// https://rust.godbolt.org/z/xbo88cbsn
+/// https://rust.godbolt.org/z/T8f77KjGc
 #[inline]
 fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -> W {
     let word_size = size_of::<W>();
@@ -413,7 +413,7 @@ fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -
         core::slice::from_raw_parts_mut(p, len)
     };
 
-    for (src, dst) in block.iter().zip(buf.chunks_exact_mut(4)) {
+    for (src, dst) in block.iter().zip(buf.chunks_exact_mut(word_size)) {
         let val = src.to_le_bytes();
         dst.copy_from_slice(val.as_ref())
     }
