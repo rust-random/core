@@ -37,7 +37,7 @@
 //! The examples below demonstrate how functions in this module can be used to implement
 //! [`RngCore`] and [`SeedableRng`] for common RNG algorithm classes.
 //!
-//! ## Single 32-bit value RNG
+//! ## RNG outputs `u32`
 //!
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
@@ -81,7 +81,7 @@
 //! # assert_eq!(buf, [0xa7, 0x8f, 0xa1, 0x7b, 0xa8]);
 //! ```
 //!
-//! ## Single 64-bit value RNG
+//! ## RNG outputs `u64`
 //!
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
@@ -125,7 +125,7 @@
 //! # assert_eq!(buf, [0xa6, 0x8f, 0xa1, 0x7b, 0x58]);
 //! ```
 //!
-//! ## 32-bit block RNG
+//! ## RNG outputs `[u32; N]`
 //!
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
@@ -190,7 +190,7 @@
 //! # assert_eq!(buf, [0x69, 0x01, 0x14, 0xb8, 0x2b]);
 //! ```
 //!
-//! ## 64-bit block RNG
+//! ## RNG outputs `[u64; N]`
 //!
 //! ```
 //! use rand_core::{RngCore, SeedableRng, le};
@@ -254,7 +254,7 @@
 //! # assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
 //! ```
 //!
-//! ## Fill-based RNG
+//! ## RNG outputs bytes
 //!
 //! ```
 //! use rand_core::RngCore;
