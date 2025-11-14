@@ -311,8 +311,8 @@ pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
 
 /// Implement `fill_bytes` via `next_u64` using little-endian order.
 #[inline]
-pub fn fill_bytes_via_next_word<W: Word>(dest: &mut [u8], mut next_word: impl FnMut() -> W) {
-    let mut chunks = dest.chunks_exact_mut(size_of::<W>());
+pub fn fill_bytes_via_next_word<W: Word>(dst: &mut [u8], mut next_word: impl FnMut() -> W) {
+    let mut chunks = dst.chunks_exact_mut(size_of::<W>());
     for chunk in &mut chunks {
         let val = next_word();
         chunk.copy_from_slice(val.to_le_bytes().as_ref());
