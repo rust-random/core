@@ -347,42 +347,29 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
 ) {
     let word_size = size_of::<W>();
 
-    let pos = buf[0].into_usize();
-    if pos < buf.len() {
-        let buf_tail = &buf[pos..];
+    let pos = buf[0];
+    let pos_usize = pos.into_usize();
+    if pos_usize < buf.len() {
+        let buf_tail = &buf[pos_usize..];
         let buf_rem = size_of_val(buf_tail);
 
         if buf_rem >= dst.len() {
-            let chunks = dst.chunks_mut(word_size);
-            let mut pos = buf[0];
-
-            for (src, dst) in buf_tail.iter().zip(chunks) {
-                let val = src.to_le_bytes();
-                dst.copy_from_slice(&val.as_ref()[..dst.len()]);
-                pos.increment();
-            }
-
-            buf[0] = pos;
+            let new_pos = read_bytes(&buf, dst, pos);
+            buf[0] = new_pos;
             return;
         }
 
         let (l, r) = dst.split_at_mut(buf_rem);
+        read_bytes(&buf, l, pos);
         dst = r;
-
-        let chunks = l.chunks_exact_mut(word_size);
-        for (src, dst) in buf_tail.iter().zip(chunks) {
-            let val = src.to_le_bytes();
-            dst.copy_from_slice(&val.as_ref()[..dst.len()]);
-        }
     }
 
     let mut blocks = dst.chunks_exact_mut(N * word_size);
-    let mut temp_buf = [W::from_usize(0); N];
+    let zero = W::from_usize(0);
+    let mut temp_buf = [zero; N];
     for block in &mut blocks {
         generate_block(&mut temp_buf);
-        for (chunk, word) in block.chunks_exact_mut(word_size).zip(temp_buf.iter()) {
-            chunk.copy_from_slice(word.to_le_bytes().as_ref());
-        }
+        read_bytes(&temp_buf, block, zero);
     }
 
     let rem = blocks.into_remainder();
@@ -390,18 +377,42 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
         W::from_usize(N)
     } else {
         generate_block(buf);
-        let chunks = rem.chunks_mut(word_size);
-        let mut pos = W::from_usize(0);
-
-        for (src, dst) in buf.iter().zip(chunks) {
-            let val = src.to_le_bytes();
-            dst.copy_from_slice(&val.as_ref()[..dst.len()]);
-            pos.increment();
-        }
-
-        pos
+        read_bytes::<W, N>(&buf, rem, zero)
     };
     buf[0] = new_pos;
+}
+
+/// Reads bytes from `&block[pos..new_pos]` to `dst` using little endian byte order
+/// ignoring the tail bytes if necessary and returns `new_pos`.
+///
+/// This function is written in a way which helps the compiler to compile it down
+/// to one `memcpy`. The temporary buffer gets eliminated by the compiler, see:
+/// https://rust.godbolt.org/z/Kaq7zbsT3
+fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -> W {
+    let word_size = size_of::<W>();
+    let pos = pos.into_usize();
+    assert!(size_of_val(&block[pos..]) >= size_of_val(dst));
+
+    // TODO: replace with `[0u8; { size_of::<W>() * N }]` on
+    // stabilization of `generic_const_exprs`
+    let mut buf = [W::from_usize(0); N];
+    // SAFETY: it's safe to reference `[u32/u64; N]` as `&mut [u8]`
+    // with length equal to `size_of::<u32/u64>() * N`
+    let buf: &mut [u8] = unsafe {
+        let p: *mut u8 = buf.as_mut_ptr().cast();
+        let len = word_size * N;
+        core::slice::from_raw_parts_mut(p, len)
+    };
+
+    for (src, dst) in block.iter().zip(buf.chunks_exact_mut(4)) {
+        let val = src.to_le_bytes();
+        dst.copy_from_slice(val.as_ref())
+    }
+
+    let offset = pos * word_size;
+    dst.copy_from_slice(&buf[offset..][..dst.len()]);
+    let read_words = dst.len().div_ceil(word_size);
+    W::from_usize(pos + read_words)
 }
 
 /// Sealed trait implemented for `u32` and `u64`.
