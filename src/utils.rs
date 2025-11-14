@@ -311,10 +311,11 @@ pub fn read_words_into<W: Word>(src: &[u8], dst: &mut [W]) {
 /// Create new block buffer.
 ///
 /// # Panics
-/// If `N` is smaller than 2 or bigger than `W::MAX`.
+/// If `N` is smaller than 2 or can not be represented as `W`.
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
     assert!(N > 2);
-    assert!(N < W::MAX.into_usize());
+    // Check that `N` can be converted into `W`.
+    let _ = W::from_usize(N);
     let mut res = [W::from_usize(0); N];
     res[0] = W::from_usize(N);
     res
