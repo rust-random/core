@@ -1,21 +1,13 @@
-//! The `Generator` trait and implementation helpers
+//! Support for block generators
 //!
-//! The [`Generator`] trait exists to assist in the implementation of RNGs
-//! which generate a block of data in a cache instead of returning generated
-//! values directly.
-//!
-//! Usage of this trait is optional, but provides two advantages:
-//! implementations only need to concern themselves with generation of the
-//! block, not the various [`RngCore`] methods (especially [`fill_bytes`], where
-//! the optimal implementations are not trivial), and this allows
-//! `ReseedingRng` (see [`rand`](https://docs.rs/rand) crate) perform periodic
-//! reseeding with very low overhead.
+//! The [`BlockRng`] and [`BlockRng64`] types may be used to provide an
+//! implementation of [`RngCore`] over a block [`Generator`].
 //!
 //! # Example
 //!
 //! ```no_run
-//! use rand_core::{RngCore, SeedableRng};
-//! use rand_core::block::{Generator, BlockRng};
+//! use rand_core::{Generator, RngCore, SeedableRng};
+//! use rand_core::block::BlockRng;
 //!
 //! struct MyRngCore;
 //!
@@ -45,56 +37,10 @@
 //! [`fill_bytes`]: RngCore::fill_bytes
 
 use crate::le::fill_via_chunks;
-use crate::{CryptoRng, RngCore, SeedableRng, TryRngCore};
+use crate::*;
 use core::fmt;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-
-/// A random generator
-pub trait Generator {
-    /// The result type.
-    ///
-    /// This could be a simple word like `u64` or an array like `[u32; 16]`.
-    type Result;
-
-    /// Generate a new result.
-    ///
-    /// Since [`Self::Result`] may be large, the output is passed by reference.
-    /// Word generators should likely implement this as a shim over another
-    /// method:
-    /// ```
-    /// pub struct CountingGenerator(u64);
-    /// impl CountingGenerator {
-    ///     fn next(&mut self) -> u64 {
-    ///         let x = self.0;
-    ///         self.0 = self.0.wrapping_add(1);
-    ///         x
-    ///     }
-    /// }
-    ///
-    /// impl rand_core::block::Generator for CountingGenerator {
-    ///     type Result = u64;
-    ///
-    ///     #[inline]
-    ///     fn generate(&mut self, result: &mut Self::Result) {
-    ///         *result = self.next();
-    ///     }
-    /// }
-    /// ```
-    fn generate(&mut self, result: &mut Self::Result);
-}
-
-/// A cryptographically secure generator
-///
-/// This is a marker trait used to indicate that a [`Generator`] implementation
-/// is supposed to be cryptographically secure.
-///
-/// Mock generators should not implement this trait *except* under a
-/// `#[cfg(test)]` attribute to ensure that mock "crypto" generators cannot be
-/// used in production.
-///
-/// See [`CryptoRng`] docs for more information.
-pub trait CryptoGenerator: Generator {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
 /// [`Generator`] with `u32` array buffer; i.e. this can be used to implement
@@ -247,9 +193,7 @@ impl<const N: usize, R: Generator<Result = [u32; N]>> RngCore for BlockRng<R> {
     }
 }
 
-impl<const N: usize, R: Generator<Result = [u32; N]> + SeedableRng> SeedableRng
-    for BlockRng<R>
-{
+impl<const N: usize, R: Generator<Result = [u32; N]> + SeedableRng> SeedableRng for BlockRng<R> {
     type Seed = R::Seed;
 
     #[inline(always)]
@@ -306,9 +250,7 @@ pub struct BlockRng64<R: Generator + ?Sized> {
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<const N: usize, R: Generator<Result = [u64; N]> + fmt::Debug> fmt::Debug
-    for BlockRng64<R>
-{
+impl<const N: usize, R: Generator<Result = [u64; N]> + fmt::Debug> fmt::Debug for BlockRng64<R> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng64")
             .field("core", &self.core)
@@ -414,9 +356,7 @@ impl<const N: usize, R: Generator<Result = [u64; N]>> RngCore for BlockRng64<R> 
     }
 }
 
-impl<const N: usize, R: Generator<Result = [u64; N]> + SeedableRng> SeedableRng
-    for BlockRng64<R>
-{
+impl<const N: usize, R: Generator<Result = [u64; N]> + SeedableRng> SeedableRng for BlockRng64<R> {
     type Seed = R::Seed;
 
     #[inline(always)]

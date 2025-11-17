@@ -32,6 +32,52 @@ use core::{fmt, ops::DerefMut};
 pub mod block;
 pub mod le;
 
+/// A random generator
+pub trait Generator {
+    /// The result type.
+    ///
+    /// This could be a simple word like `u64` or an array like `[u32; 16]`.
+    type Result;
+
+    /// Generate a new result.
+    ///
+    /// Since [`Self::Result`] may be large, the output is passed by reference.
+    /// Word generators should likely implement this as a shim over another
+    /// method:
+    /// ```
+    /// pub struct CountingGenerator(u64);
+    /// impl CountingGenerator {
+    ///     fn next(&mut self) -> u64 {
+    ///         let x = self.0;
+    ///         self.0 = self.0.wrapping_add(1);
+    ///         x
+    ///     }
+    /// }
+    ///
+    /// impl rand_core::Generator for CountingGenerator {
+    ///     type Result = u64;
+    ///
+    ///     #[inline]
+    ///     fn generate(&mut self, result: &mut Self::Result) {
+    ///         *result = self.next();
+    ///     }
+    /// }
+    /// ```
+    fn generate(&mut self, result: &mut Self::Result);
+}
+
+/// A cryptographically secure generator
+///
+/// This is a marker trait used to indicate that a [`Generator`] implementation
+/// is supposed to be cryptographically secure.
+///
+/// Mock generators should not implement this trait *except* under a
+/// `#[cfg(test)]` attribute to ensure that mock "crypto" generators cannot be
+/// used in production.
+///
+/// See [`CryptoRng`] docs for more information.
+pub trait CryptoGenerator: Generator {}
+
 /// Implementation-level interface for RNGs
 ///
 /// This trait encapsulates the low-level functionality common to all
