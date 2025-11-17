@@ -20,7 +20,6 @@
 //! struct MyRngCore;
 //!
 //! impl BlockRngCore for MyRngCore {
-//!     type Item = u32;
 //!     type Results = [u32; 16];
 //!
 //!     fn generate(&mut self, results: &mut Self::Results) {
@@ -55,12 +54,9 @@ use core::fmt;
 ///
 /// See the [module][crate::block] documentation for details.
 pub trait BlockRngCore {
-    /// Results element type, e.g. `u32`.
-    type Item;
-
     /// Results type. This is the 'block' an RNG implementing `BlockRngCore`
     /// generates, which will usually be an array like `[u32; 16]`.
-    type Results: AsRef<[Self::Item]> + AsMut<[Self::Item]> + Default;
+    type Results;
 
     /// Generate a new block of results.
     fn generate(&mut self, results: &mut Self::Results);
@@ -114,7 +110,7 @@ pub struct BlockRng<R: BlockRngCore> {
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u32; N]> + fmt::Debug> fmt::Debug for BlockRng<R> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng")
             .field("core", &self.core)
@@ -124,16 +120,15 @@ impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore> BlockRng<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u32; N]>> BlockRng<R> {
     /// Create a new `BlockRng` from an existing RNG implementing
     /// `BlockRngCore`. Results will be generated on first use.
     #[inline]
     pub fn new(core: R) -> BlockRng<R> {
-        let results_empty = R::Results::default();
         BlockRng {
             core,
-            index: results_empty.as_ref().len(),
-            results: results_empty,
+            index: N,
+            results: [0; N],
         }
     }
 
@@ -164,7 +159,7 @@ impl<R: BlockRngCore> BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u32; N]>> RngCore for BlockRng<R> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         if self.index >= self.results.as_ref().len() {
@@ -217,7 +212,9 @@ impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u32; N]> + SeedableRng> SeedableRng
+    for BlockRng<R>
+{
     type Seed = R::Seed;
 
     #[inline(always)]
@@ -241,7 +238,7 @@ impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng<R> {
     }
 }
 
-impl<R: CryptoBlockRng + BlockRngCore<Item = u32>> CryptoRng for BlockRng<R> {}
+impl<const N: usize, R: CryptoBlockRng<Results = [u32; N]>> CryptoRng for BlockRng<R> {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
 /// [`BlockRngCore`] with `u64` array buffer; i.e. this can be used to implement
@@ -273,7 +270,9 @@ pub struct BlockRng64<R: BlockRngCore + ?Sized> {
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng64<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u64; N]> + fmt::Debug> fmt::Debug
+    for BlockRng64<R>
+{
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng64")
             .field("core", &self.core)
@@ -284,12 +283,12 @@ impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore> BlockRng64<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u64; N]>> BlockRng64<R> {
     /// Create a new `BlockRng` from an existing RNG implementing
     /// `BlockRngCore`. Results will be generated on first use.
     #[inline]
     pub fn new(core: R) -> BlockRng64<R> {
-        let results_empty = R::Results::default();
+        let results_empty = [0; N];
         BlockRng64 {
             core,
             index: results_empty.as_ref().len(),
@@ -327,7 +326,7 @@ impl<R: BlockRngCore> BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u64; N]>> RngCore for BlockRng64<R> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         let mut index = self.index - self.half_used as usize;
@@ -379,7 +378,9 @@ impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng64<R> {
+impl<const N: usize, R: BlockRngCore<Results = [u64; N]> + SeedableRng> SeedableRng
+    for BlockRng64<R>
+{
     type Seed = R::Seed;
 
     #[inline(always)]
@@ -403,7 +404,7 @@ impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng64<R> {
     }
 }
 
-impl<R: CryptoBlockRng + BlockRngCore<Item = u64>> CryptoRng for BlockRng64<R> {}
+impl<const N: usize, R: CryptoBlockRng<Results = [u64; N]>> CryptoRng for BlockRng64<R> {}
 
 #[cfg(test)]
 mod test {
@@ -416,7 +417,6 @@ mod test {
     }
 
     impl BlockRngCore for DummyRng {
-        type Item = u32;
         type Results = [u32; 16];
 
         fn generate(&mut self, results: &mut Self::Results) {
@@ -467,7 +467,6 @@ mod test {
     }
 
     impl BlockRngCore for DummyRng64 {
-        type Item = u64;
         type Results = [u64; 8];
 
         fn generate(&mut self, results: &mut Self::Results) {
