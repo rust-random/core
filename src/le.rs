@@ -301,7 +301,7 @@
 use crate::RngCore;
 
 /// Implement `next_u64` via `next_u32` using little-endian order.
-#[inline]
+#[inline(always)]
 pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     // Use LE; we explicitly generate one value before the next.
     let x = u64::from(rng.next_u32());
@@ -328,7 +328,7 @@ pub fn fill_bytes_via_next_word<W: Word>(dst: &mut [u8], mut next_word: impl FnM
 ///
 /// # Panics
 /// If `size_of_val(src) != size_of::<[W; N]>()`.
-#[inline]
+#[inline(always)]
 pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
     assert_eq!(size_of_val(src), size_of::<[W; N]>());
     let mut dst = [W::from_usize(0); N];
@@ -346,7 +346,7 @@ pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
 ///
 /// # Panics
 /// If `N` is equal to 0 or can not be represented as `W`.
-#[inline]
+#[inline(always)]
 pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
     let mut res = [W::from_usize(0); N];
     res[0] = W::from_usize(N);
@@ -354,7 +354,7 @@ pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
 }
 
 /// Implement `next_u32/u64` function using buffer and block generation closure.
-#[inline]
+#[inline(always)]
 pub fn next_word_via_gen_block<W: Word, const N: usize>(
     buf: &mut [W; N],
     mut generate_block: impl FnMut(&mut [W; N]),
@@ -374,7 +374,7 @@ pub fn next_word_via_gen_block<W: Word, const N: usize>(
 }
 
 /// Implement `next_u64` function using buffer and block generation closure.
-#[inline]
+#[inline(always)]
 pub fn next_u64_via_gen_block<const N: usize>(
     buf: &mut [u32; N],
     mut generate_block: impl FnMut(&mut [u32; N]),
@@ -402,7 +402,7 @@ pub fn next_u64_via_gen_block<const N: usize>(
 }
 
 /// Implement `fill_bytes` using buffer and block generation closure.
-#[inline]
+#[inline(always)]
 pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
     mut dst: &mut [u8],
     buf: &mut [W; N],
@@ -455,7 +455,7 @@ pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
 /// This function is written in a way which helps the compiler to compile it down
 /// to one `memcpy`. The temporary buffer gets eliminated by the compiler, see:
 /// https://rust.godbolt.org/z/T8f77KjGc
-#[inline]
+#[inline(always)]
 fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -> W {
     let word_size = size_of::<W>();
     let pos = pos.into_usize();
