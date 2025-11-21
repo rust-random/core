@@ -49,6 +49,7 @@
 //! impl SeedableRng for Step32Rng {
 //!     type Seed = [u8; 4];
 //!
+//!     #[inline]
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         // Always use little-endian byte order to ensure portable results
 //!         let state = u32::from_le_bytes(seed);
@@ -57,6 +58,7 @@
 //! }
 //!
 //! impl RngCore for Step32Rng {
+//!     #[inline]
 //!     fn next_u32(&mut self) -> u32 {
 //!         // ...
 //!         # let val = self.state;
@@ -64,10 +66,12 @@
 //!         # val
 //!     }
 //!
+//!     #[inline]
 //!     fn next_u64(&mut self) -> u64 {
 //!         le::next_u64_via_u32(self)
 //!     }
 //!
+//!     #[inline]
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         le::fill_bytes_via_next_word(dst, || self.next_u32());
 //!     }
@@ -93,6 +97,7 @@
 //! impl SeedableRng for Step64Rng {
 //!     type Seed = [u8; 8];
 //!
+//!     #[inline]
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         // Always use little-endian byte order to ensure portable results
 //!         let state = u64::from_le_bytes(seed);
@@ -101,10 +106,12 @@
 //! }
 //!
 //! impl RngCore for Step64Rng {
+//!     #[inline]
 //!     fn next_u32(&mut self) -> u32 {
 //!         self.next_u64() as u32
 //!     }
 //!
+//!     #[inline]
 //!     fn next_u64(&mut self) -> u64 {
 //!         // ...
 //!         # let val = self.state;
@@ -112,6 +119,7 @@
 //!         # val
 //!     }
 //!
+//!     #[inline]
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         le::fill_bytes_via_next_word(dst, || self.next_u64());
 //!     }
@@ -156,6 +164,7 @@
 //! impl SeedableRng for Block8x32Rng {
 //!     type Seed = [u8; 32];
 //!
+//!     #[inline]
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let seed: [u32; 8] = le::read_words(&seed);
 //!         Self {
@@ -166,16 +175,19 @@
 //! }
 //!
 //! impl RngCore for Block8x32Rng {
+//!     #[inline]
 //!     fn next_u32(&mut self) -> u32 {
 //!         let Self { inner, buffer } = self;
 //!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
+//!     #[inline]
 //!     fn next_u64(&mut self) -> u64 {
 //!         let Self { inner, buffer } = self;
 //!         le::next_u64_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
+//!     #[inline]
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         let Self { inner, buffer } = self;
 //!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
@@ -221,6 +233,7 @@
 //! impl SeedableRng for Block4x64Rng {
 //!     type Seed = [u8; 32];
 //!
+//!     #[inline]
 //!     fn from_seed(seed: Self::Seed) -> Self {
 //!         let seed: [u64; 4] = le::read_words(&seed);
 //!         Self {
@@ -231,15 +244,18 @@
 //! }
 //!
 //! impl RngCore for Block4x64Rng {
+//!     #[inline]
 //!     fn next_u32(&mut self) -> u32 {
 //!         self.next_u64() as u32
 //!     }
 //!
+//!     #[inline]
 //!     fn next_u64(&mut self) -> u64 {
 //!         let Self { inner, buffer } = self;
 //!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
 //!     }
 //!
+//!     #[inline]
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         let Self { inner, buffer } = self;
 //!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
@@ -265,18 +281,21 @@
 //! }
 //!
 //! impl RngCore for FillRng {
+//!     #[inline]
 //!     fn next_u32(&mut self) -> u32 {
 //!         let mut buf = [0; 4];
 //!         self.fill_bytes(&mut buf);
 //!         u32::from_le_bytes(buf)
 //!     }
 //!
+//!     #[inline]
 //!     fn next_u64(&mut self) -> u64 {
 //!         let mut buf = [0; 8];
 //!         self.fill_bytes(&mut buf);
 //!         u64::from_le_bytes(buf)
 //!     }
 //!
+//!     #[inline]
 //!     fn fill_bytes(&mut self, dst: &mut [u8]) {
 //!         // ...
 //!         # for byte in dst {
