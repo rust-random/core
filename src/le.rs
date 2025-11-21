@@ -1,45 +1,326 @@
-//! # Little-Endian utilities
+//! Helper utilities.
 //!
 //! For cross-platform reproducibility, Little-Endian order (least-significant
 //! part first) has been chosen as the standard for inter-type conversion.
-//! For example, ``next_u64_via_u32`] takes `u32`
-//! values `x, y`, then outputs `(y << 32) | x`.
+//! For example, [`next_u64_via_u32`] generates two `u32` values `x, y`,
+//! then outputs `(y << 32) | x`.
 //!
 //! Byte-swapping (like the std `to_le` functions) is only needed to convert
 //! to/from byte sequences, and since its purpose is reproducibility,
 //! non-reproducible sources (e.g. `OsRng`) need not bother with it.
 //!
-//! ### Implementing [`RngCore`]
+//! # Implementing [`SeedableRng`]
 //!
-//! Usually an implementation of [`RngCore`] will implement one of the three
-//! methods over its internal source. The following helpers are provided for
-//! the remaining implementations.
+//! In many cases, [`SeedableRng::Seed`] must be converted to `[u32]` or `[u64]`.
+//! We provide the [`read_words`] helper function for this. The examples below
+//! demonstrate how it can be used in practice.
 //!
-//! **`fn next_u32`:**
-//! -   `self.next_u64() as u32`
-//! -   `(self.next_u64() >> 32) as u32`
-//! -   <code>[next_u32_via_fill][](self)</code>
+//! [`SeedableRng`]: crate::SeedableRng
+//! [`SeedableRng::Seed`]: crate::SeedableRng::Seed
 //!
-//! **`fn next_u64`:**
-//! -   <code>[next_u64_via_u32][](self)</code>
-//! -   <code>[next_u64_via_fill][](self)</code>
+//! # Implementing [`RngCore`]
 //!
-//! **`fn fill_bytes`:**
-//! -   <code>[fill_bytes_via_next][](self, dest)</code>
+//! Usually an implementation of [`RngCore`] will implement one of the three methods
+//! over its internal source, while remaining methods are implemented on top of it.
 //!
-//! ### Implementing [`SeedableRng`]
+//! Some RNGs instead generate fixed-size blocks of data. In this case the implementations must
+//! handle buffering of the generated blocks.
 //!
-//! In many cases, [`SeedableRng::Seed`] must be converted to `[u32]` or
-//! `[u64]`. The following helpers are provided:
+//! If an implementation can generate several blocks simultaneously (e.g. using SIMD), we recommend
+//! to treat multiple generated blocks as a single large block (i.e. you should treat
+//! `[[u32; N]; M]` as `[u32; N * M]`). If the number of simultaneously generated blocks depends
+//! on CPU target features, we recommend to use the largest supported number of blocks
+//! for all target features.
 //!
-//! - [`read_u32_into`]
-//! - [`read_u64_into`]
+//! # Examples
+//!
+//! The examples below demonstrate how functions in this module can be used to implement
+//! [`RngCore`] and [`SeedableRng`] for common RNG algorithm classes.
+//!
+//! ## RNG outputs `u32`
+//!
+//! ```
+//! use rand_core::{RngCore, SeedableRng, le};
+//!
+//! pub struct Step32Rng {
+//!     state: u32
+//! }
+//!
+//! impl SeedableRng for Step32Rng {
+//!     type Seed = [u8; 4];
+//!
+//!     #[inline]
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         // Always use little-endian byte order to ensure portable results
+//!         let state = u32::from_le_bytes(seed);
+//!         Self { state }
+//!     }
+//! }
+//!
+//! impl RngCore for Step32Rng {
+//!     #[inline]
+//!     fn next_u32(&mut self) -> u32 {
+//!         // ...
+//!         # let val = self.state;
+//!         # self.state = val + 1;
+//!         # val
+//!     }
+//!
+//!     #[inline]
+//!     fn next_u64(&mut self) -> u64 {
+//!         le::next_u64_via_u32(self)
+//!     }
+//!
+//!     #[inline]
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         le::fill_bytes_via_next_word(dst, || self.next_u32());
+//!     }
+//! }
+//!
+//! # let mut rng = Step32Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0x7ba1_8fa6_7ba1_8fa5);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0xa7, 0x8f, 0xa1, 0x7b, 0xa8]);
+//! ```
+//!
+//! ## RNG outputs `u64`
+//!
+//! ```
+//! use rand_core::{RngCore, SeedableRng, le};
+//!
+//! pub struct Step64Rng {
+//!     state: u64
+//! }
+//!
+//! impl SeedableRng for Step64Rng {
+//!     type Seed = [u8; 8];
+//!
+//!     #[inline]
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         // Always use little-endian byte order to ensure portable results
+//!         let state = u64::from_le_bytes(seed);
+//!         Self { state }
+//!     }
+//! }
+//!
+//! impl RngCore for Step64Rng {
+//!     #[inline]
+//!     fn next_u32(&mut self) -> u32 {
+//!         self.next_u64() as u32
+//!     }
+//!
+//!     #[inline]
+//!     fn next_u64(&mut self) -> u64 {
+//!         // ...
+//!         # let val = self.state;
+//!         # self.state = val + 1;
+//!         # val
+//!     }
+//!
+//!     #[inline]
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         le::fill_bytes_via_next_word(dst, || self.next_u64());
+//!     }
+//! }
+//!
+//! # let mut rng = Step64Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0x0a3d_3258_7ba1_8fa5);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0xa6, 0x8f, 0xa1, 0x7b, 0x58]);
+//! ```
+//!
+//! ## RNG outputs `[u32; N]`
+//!
+//! ```
+//! use rand_core::{RngCore, SeedableRng, le};
+//!
+//! struct Block8x32RngInner {
+//!     // ...
+//!     # state: [u32; 8]
+//! }
+//!
+//! impl Block8x32RngInner {
+//!     fn new(seed: [u32; 8]) -> Self {
+//!         // ...
+//!         # Self { state: seed }
+//!     }
+//!
+//!     fn next_block(&mut self, block: &mut [u32; 8]) {
+//!         // ...
+//!         # *block = self.state;
+//!         # self.state.iter_mut().for_each(|v| *v += 1);
+//!     }
+//! }
+//!
+//! pub struct Block8x32Rng {
+//!     inner: Block8x32RngInner,
+//!     buffer: [u32; 8],
+//! }
+//!
+//! impl SeedableRng for Block8x32Rng {
+//!     type Seed = [u8; 32];
+//!
+//!     #[inline]
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         let seed: [u32; 8] = le::read_words(&seed);
+//!         Self {
+//!             inner: Block8x32RngInner::new(seed),
+//!             buffer: le::new_buffer(),
+//!         }
+//!     }
+//! }
+//!
+//! impl RngCore for Block8x32Rng {
+//!     #[inline]
+//!     fn next_u32(&mut self) -> u32 {
+//!         let Self { inner, buffer } = self;
+//!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
+//!     }
+//!
+//!     #[inline]
+//!     fn next_u64(&mut self) -> u64 {
+//!         let Self { inner, buffer } = self;
+//!         le::next_u64_via_gen_block(buffer, |block| inner.next_block(block))
+//!     }
+//!
+//!     #[inline]
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         let Self { inner, buffer } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
+//!     }
+//! }
+//!
+//! # let mut rng = Block8x32Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0xcca1_b8ea_0a3d_3258);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x69, 0x01, 0x14, 0xb8, 0x2b]);
+//! ```
+//!
+//! ## RNG outputs `[u64; N]`
+//!
+//! ```
+//! use rand_core::{RngCore, SeedableRng, le};
+//!
+//! struct Block4x64RngInner {
+//!     // ...
+//!     # state: [u64; 4],
+//! }
+//!
+//! impl Block4x64RngInner {
+//!     fn new(seed: [u64; 4]) -> Self {
+//!         // ...
+//!         # Self { state: seed }
+//!     }
+//!
+//!     fn next_block(&mut self, block: &mut [u64; 4]) {
+//!         // ...
+//!         # *block = self.state;
+//!         # self.state.iter_mut().for_each(|v| *v += 1);
+//!     }
+//! }
+//!
+//! pub struct Block4x64Rng {
+//!     inner: Block4x64RngInner,
+//!     buffer: [u64; 4],
+//! }
+//!
+//! impl SeedableRng for Block4x64Rng {
+//!     type Seed = [u8; 32];
+//!
+//!     #[inline]
+//!     fn from_seed(seed: Self::Seed) -> Self {
+//!         let seed: [u64; 4] = le::read_words(&seed);
+//!         Self {
+//!             inner: Block4x64RngInner::new(seed),
+//!             buffer: le::new_buffer(),
+//!         }
+//!     }
+//! }
+//!
+//! impl RngCore for Block4x64Rng {
+//!     #[inline]
+//!     fn next_u32(&mut self) -> u32 {
+//!         self.next_u64() as u32
+//!     }
+//!
+//!     #[inline]
+//!     fn next_u64(&mut self) -> u64 {
+//!         let Self { inner, buffer } = self;
+//!         le::next_word_via_gen_block(buffer, |block| inner.next_block(block))
+//!     }
+//!
+//!     #[inline]
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         let Self { inner, buffer } = self;
+//!         le::fill_bytes_via_gen_block(dst, buffer, |block| inner.next_block(block));
+//!     }
+//! }
+//!
+//! # let mut rng = Block4x64Rng::seed_from_u64(42);
+//! # assert_eq!(rng.next_u32(), 0x7ba1_8fa4);
+//! # assert_eq!(rng.next_u64(), 0xb814_0169_cca1_b8ea);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x2b, 0x8c, 0xc8, 0x75, 0x18]);
+//! ```
+//!
+//! ## RNG outputs bytes
+//!
+//! ```
+//! use rand_core::RngCore;
+//!
+//! pub struct FillRng {
+//!     // ...
+//!     # state: u8,
+//! }
+//!
+//! impl RngCore for FillRng {
+//!     #[inline]
+//!     fn next_u32(&mut self) -> u32 {
+//!         let mut buf = [0; 4];
+//!         self.fill_bytes(&mut buf);
+//!         u32::from_le_bytes(buf)
+//!     }
+//!
+//!     #[inline]
+//!     fn next_u64(&mut self) -> u64 {
+//!         let mut buf = [0; 8];
+//!         self.fill_bytes(&mut buf);
+//!         u64::from_le_bytes(buf)
+//!     }
+//!
+//!     #[inline]
+//!     fn fill_bytes(&mut self, dst: &mut [u8]) {
+//!         // ...
+//!         # for byte in dst {
+//!         #     let val = self.state;
+//!         #     self.state = val + 1;
+//!         #     *byte = val;
+//!         # }
+//!     }
+//! }
+//!
+//! # let mut rng = FillRng { state: 0 };
+//! # assert_eq!(rng.next_u32(), 0x03_020100);
+//! # assert_eq!(rng.next_u64(), 0x0b0a_0908_0706_0504);
+//! # let mut buf = [0u8; 5];
+//! # rng.fill_bytes(&mut buf);
+//! # assert_eq!(buf, [0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
+//! ```
+//!
+//! Note that you can use `from_ne_bytes` instead of `from_le_bytes`
+//! if your `fill_bytes` implementation is not reproducible.
 
 use crate::RngCore;
-#[allow(unused)]
-use crate::SeedableRng;
 
-/// Implement `next_u64` via `next_u32`, little-endian order.
+/// Implement `next_u64` via `next_u32` using little-endian order.
+#[inline(always)]
 pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     // Use LE; we explicitly generate one value before the next.
     let x = u64::from(rng.next_u32());
@@ -47,189 +328,207 @@ pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
     (y << 32) | x
 }
 
-/// Implement `fill_bytes` via `next_u64` and `next_u32`, little-endian order.
+/// Implement `fill_bytes` via `next_u64` using little-endian order.
+#[inline]
+pub fn fill_bytes_via_next_word<W: Word>(dst: &mut [u8], mut next_word: impl FnMut() -> W) {
+    let mut chunks = dst.chunks_exact_mut(size_of::<W>());
+    for chunk in &mut chunks {
+        let val = next_word();
+        chunk.copy_from_slice(val.to_le_bytes().as_ref());
+    }
+    let rem = chunks.into_remainder();
+    if !rem.is_empty() {
+        let val = next_word().to_le_bytes();
+        rem.copy_from_slice(&val.as_ref()[..rem.len()]);
+    }
+}
+
+/// Reads array of words from byte slice `src` using little endian order.
 ///
-/// The fastest way to fill a slice is usually to work as long as possible with
-/// integers. That is why this method mostly uses `next_u64`, and only when
-/// there are 4 or less bytes remaining at the end of the slice it uses
-/// `next_u32` once.
-pub fn fill_bytes_via_next<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
-    let mut left = dest;
-    while left.len() >= 8 {
-        let (l, r) = { left }.split_at_mut(8);
-        left = r;
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        l.copy_from_slice(&chunk);
+/// # Panics
+/// If `size_of_val(src) != size_of::<[W; N]>()`.
+#[inline(always)]
+pub fn read_words<W: Word, const N: usize>(src: &[u8]) -> [W; N] {
+    assert_eq!(size_of_val(src), size_of::<[W; N]>());
+    let mut dst = [W::from_usize(0); N];
+    let chunks = src.chunks_exact(size_of::<W>());
+    for (out, chunk) in dst.iter_mut().zip(chunks) {
+        let Ok(bytes) = chunk.try_into() else {
+            unreachable!()
+        };
+        *out = W::from_le_bytes(bytes);
     }
-    let n = left.len();
-    if n > 4 {
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
-    } else if n > 0 {
-        let chunk: [u8; 4] = rng.next_u32().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
-    }
+    dst
 }
 
-pub(crate) trait Observable: Copy {
-    type Bytes: Sized + AsRef<[u8]>;
-    fn to_le_bytes(self) -> Self::Bytes;
-}
-impl Observable for u32 {
-    type Bytes = [u8; 4];
-
-    fn to_le_bytes(self) -> Self::Bytes {
-        Self::to_le_bytes(self)
-    }
-}
-impl Observable for u64 {
-    type Bytes = [u8; 8];
-
-    fn to_le_bytes(self) -> Self::Bytes {
-        Self::to_le_bytes(self)
-    }
-}
-
-/// Fill dest from src
+/// Create new block buffer.
 ///
-/// Returns `(n, byte_len)`. `src[..n]` is consumed,
-/// `dest[..byte_len]` is filled. `src[n..]` and `dest[byte_len..]` are left
-/// unaltered.
-pub(crate) fn fill_via_chunks<T: Observable>(src: &[T], dest: &mut [u8]) -> (usize, usize) {
-    let size = core::mem::size_of::<T>();
+/// # Panics
+/// If `N` is equal to 0 or can not be represented as `W`.
+#[inline(always)]
+pub fn new_buffer<W: Word, const N: usize>() -> [W; N] {
+    let mut res = [W::from_usize(0); N];
+    res[0] = W::from_usize(N);
+    res
+}
 
-    // Always use little endian for portability of results.
-
-    let mut dest = dest.chunks_exact_mut(size);
-    let mut src = src.iter();
-
-    let zipped = dest.by_ref().zip(src.by_ref());
-    let num_chunks = zipped.len();
-    zipped.for_each(|(dest, src)| dest.copy_from_slice(src.to_le_bytes().as_ref()));
-
-    let byte_len = num_chunks * size;
-    if let Some(src) = src.next() {
-        // We have consumed all full chunks of dest, but not src.
-        let dest = dest.into_remainder();
-        let n = dest.len();
-        if n > 0 {
-            dest.copy_from_slice(&src.to_le_bytes().as_ref()[..n]);
-            return (num_chunks + 1, byte_len + n);
+/// Implement `next_u32/u64` function using buffer and block generation closure.
+#[inline(always)]
+pub fn next_word_via_gen_block<W: Word, const N: usize>(
+    buf: &mut [W; N],
+    mut generate_block: impl FnMut(&mut [W; N]),
+) -> W {
+    let pos = buf[0].into_usize();
+    debug_assert_ne!(pos, 0, "cursor position should not be zero");
+    match buf.get(pos) {
+        Some(&val) => {
+            buf[0].increment();
+            val
+        }
+        None => {
+            generate_block(buf);
+            core::mem::replace(&mut buf[0], W::from_usize(1))
         }
     }
-    (num_chunks, byte_len)
 }
 
-/// Implement `next_u32` via `fill_bytes`, little-endian order.
-pub fn next_u32_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u32 {
-    let mut buf = [0; 4];
-    rng.fill_bytes(&mut buf);
-    u32::from_le_bytes(buf)
+/// Implement `next_u64` function using buffer and block generation closure.
+#[inline(always)]
+pub fn next_u64_via_gen_block<const N: usize>(
+    buf: &mut [u32; N],
+    mut generate_block: impl FnMut(&mut [u32; N]),
+) -> u64 {
+    use core::mem::replace;
+    let pos = usize::try_from(buf[0]).unwrap();
+
+    let (x, y) = if pos < N - 1 {
+        let xy = (buf[pos], buf[pos + 1]);
+        buf[0] += 2;
+        xy
+    } else if pos == N - 1 {
+        let x = buf[pos];
+        generate_block(buf);
+        let y = replace(&mut buf[0], 1);
+        (x, y)
+    } else {
+        generate_block(buf);
+        let x = replace(&mut buf[0], 2);
+        let y = buf[1];
+        (x, y)
+    };
+
+    u64::from(y) << 32 | u64::from(x)
 }
 
-/// Implement `next_u64` via `fill_bytes`, little-endian order.
-pub fn next_u64_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
-    let mut buf = [0; 8];
-    rng.fill_bytes(&mut buf);
-    u64::from_le_bytes(buf)
-}
+/// Implement `fill_bytes` using buffer and block generation closure.
+#[inline(always)]
+pub fn fill_bytes_via_gen_block<W: Word, const N: usize>(
+    mut dst: &mut [u8],
+    buf: &mut [W; N],
+    mut generate_block: impl FnMut(&mut [W; N]),
+) {
+    let word_size = size_of::<W>();
 
-/// Fills `dst: &mut [u32]` from `src`
-///
-/// Reads use Little-Endian byte order, allowing portable reproduction of `dst`
-/// from a byte slice.
-///
-/// # Panics
-///
-/// If `src` has insufficient length (if `src.len() < 4*dst.len()`).
-#[inline]
-#[track_caller]
-pub fn read_u32_into(src: &[u8], dst: &mut [u32]) {
-    assert!(src.len() >= 4 * dst.len());
-    for (out, chunk) in dst.iter_mut().zip(src.chunks_exact(4)) {
-        *out = u32::from_le_bytes(chunk.try_into().unwrap());
+    let pos = buf[0];
+    let pos_usize = pos.into_usize();
+    debug_assert_ne!(pos_usize, 0, "cursor position should not be zero");
+    if pos_usize < buf.len() {
+        let buf_tail = &buf[pos_usize..];
+        let buf_rem = size_of_val(buf_tail);
+
+        if buf_rem >= dst.len() {
+            let new_pos = read_bytes(buf, dst, pos);
+            buf[0] = new_pos;
+            return;
+        }
+
+        let (l, r) = dst.split_at_mut(buf_rem);
+        read_bytes(buf, l, pos);
+        dst = r;
     }
+
+    let mut blocks = dst.chunks_exact_mut(N * word_size);
+    let zero = W::from_usize(0);
+    for block in &mut blocks {
+        // We intentionally use the temporary buffer to prevent unnecessary writes
+        // to the original `buf` and to enable potential optimization of writing
+        // generated data directly into `block`.
+        let mut buf = [zero; N];
+        generate_block(&mut buf);
+        read_bytes(&buf, block, zero);
+    }
+
+    let rem = blocks.into_remainder();
+    let new_pos = if rem.is_empty() {
+        W::from_usize(N)
+    } else {
+        generate_block(buf);
+        read_bytes::<W, N>(buf, rem, zero)
+    };
+    buf[0] = new_pos;
 }
 
-/// Fills `dst: &mut [u64]` from `src`
+/// Reads bytes from `&block[pos..new_pos]` to `dst` using little endian byte order
+/// ignoring the tail bytes if necessary and returns `new_pos`.
 ///
-/// # Panics
-///
-/// If `src` has insufficient length (if `src.len() < 8*dst.len()`).
-#[inline]
-#[track_caller]
-pub fn read_u64_into(src: &[u8], dst: &mut [u64]) {
-    assert!(src.len() >= 8 * dst.len());
-    for (out, chunk) in dst.iter_mut().zip(src.chunks_exact(8)) {
-        *out = u64::from_le_bytes(chunk.try_into().unwrap());
+/// This function is written in a way which helps the compiler to compile it down
+/// to one `memcpy`. The temporary buffer gets eliminated by the compiler, see:
+/// https://rust.godbolt.org/z/T8f77KjGc
+#[inline(always)]
+fn read_bytes<W: Word, const N: usize>(block: &[W; N], dst: &mut [u8], pos: W) -> W {
+    let word_size = size_of::<W>();
+    let pos = pos.into_usize();
+    assert!(size_of_val(&block[pos..]) >= size_of_val(dst));
+
+    // TODO: replace with `[0u8; { size_of::<W>() * N }]` on
+    // stabilization of `generic_const_exprs`
+    let mut buf = [W::from_usize(0); N];
+    // SAFETY: it's safe to reference `[u32/u64; N]` as `&mut [u8]`
+    // with length equal to `size_of::<u32/u64>() * N`
+    let buf: &mut [u8] = unsafe {
+        let p: *mut u8 = buf.as_mut_ptr().cast();
+        let len = word_size * N;
+        core::slice::from_raw_parts_mut(p, len)
+    };
+
+    for (src, dst) in block.iter().zip(buf.chunks_exact_mut(word_size)) {
+        let val = src.to_le_bytes();
+        dst.copy_from_slice(val.as_ref())
     }
+
+    let offset = pos * word_size;
+    dst.copy_from_slice(&buf[offset..][..dst.len()]);
+    let read_words = dst.len().div_ceil(word_size);
+    W::from_usize(pos + read_words)
 }
+
+/// Sealed trait implemented for `u32` and `u64`.
+pub trait Word: crate::sealed::Sealed {}
+
+impl Word for u32 {}
+impl Word for u64 {}
 
 #[cfg(test)]
 mod test {
     use super::*;
 
     #[test]
-    fn test_fill_via_u32_chunks() {
-        let src_orig = [1u32, 2, 3];
-
-        let src = src_orig;
-        let mut dst = [0u8; 11];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (3, 11));
-        assert_eq!(dst, [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 13];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (3, 12));
-        assert_eq!(dst, [1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 5];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 5));
-        assert_eq!(dst, [1, 0, 0, 0, 2]);
-    }
-
-    #[test]
-    fn test_fill_via_u64_chunks() {
-        let src_orig = [1u64, 2];
-
-        let src = src_orig;
-        let mut dst = [0u8; 11];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 11));
-        assert_eq!(dst, [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 17];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (2, 16));
-        assert_eq!(dst, [1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0]);
-
-        let src = src_orig;
-        let mut dst = [0u8; 5];
-        assert_eq!(fill_via_chunks(&src, &mut dst), (1, 5));
-        assert_eq!(dst, [1, 0, 0, 0, 0]);
-    }
-
-    #[test]
     fn test_read() {
         let bytes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
 
-        let mut buf = [0u32; 4];
-        read_u32_into(&bytes, &mut buf);
+        let buf: [u32; 4] = read_words(&bytes);
         assert_eq!(buf[0], 0x04030201);
         assert_eq!(buf[3], 0x100F0E0D);
 
-        let mut buf = [0u32; 3];
-        read_u32_into(&bytes[1..13], &mut buf); // unaligned
+        let buf: [u32; 3] = read_words(&bytes[1..13]); // unaligned
         assert_eq!(buf[0], 0x05040302);
         assert_eq!(buf[2], 0x0D0C0B0A);
 
-        let mut buf = [0u64; 2];
-        read_u64_into(&bytes, &mut buf);
+        let buf: [u64; 2] = read_words(&bytes);
         assert_eq!(buf[0], 0x0807060504030201);
         assert_eq!(buf[1], 0x100F0E0D0C0B0A09);
 
-        let mut buf = [0u64; 1];
-        read_u64_into(&bytes[7..15], &mut buf); // unaligned
+        let buf: [u64; 1] = read_words(&bytes[7..15]); // unaligned
         assert_eq!(buf[0], 0x0F0E0D0C0B0A0908);
     }
 }
