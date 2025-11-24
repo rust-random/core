@@ -24,9 +24,3 @@ rustdoc-args = ["--generate-link-to-definition"]
 
 [package.metadata.playground]
 all-features = true
-
-[features]
-serde = ["dep:serde"] # enables serde for BlockRng wrapper
-
-[dependencies]
-serde = { version = "1.0.103", features = ["derive"], optional = true }
