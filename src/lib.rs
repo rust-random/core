@@ -29,8 +29,8 @@
 
 use core::{fmt, ops::DerefMut};
 
-pub mod block;
 pub mod le;
+mod sealed;
 
 /// A random generator
 pub trait Generator {
@@ -110,7 +110,7 @@ pub trait CryptoGenerator: Generator {}
 ///
 /// Typically an RNG will implement only one of the methods available
 /// in this trait directly, then use the helper functions from the
-/// [`le` module](crate::le) to implement the other methods.
+/// [`le`] module to implement the other methods.
 ///
 /// Note that implementors of [`RngCore`] also automatically implement
 /// the [`TryRngCore`] trait with the `Error` associated type being
@@ -566,8 +566,7 @@ mod test {
             type Seed = [u8; 8];
 
             fn from_seed(seed: Self::Seed) -> Self {
-                let mut x = [0u64; 1];
-                le::read_u64_into(&seed, &mut x);
+                let x: [u64; 1] = le::read_words(&seed);
                 SeedableNum(x[0])
             }
         }
