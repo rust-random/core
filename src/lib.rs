@@ -1,4 +1,4 @@
-// Hidde badges and from generated docs
+// Hide badges from generated docs
 //! <style> .badges { display: none; } </style>
 
 #![no_std]
