@@ -1,9 +1,8 @@
 # rand_core: core random number generation traits
 
-[![crate][crate-image]][crate-link]
+[![crate][crate-badge]][crate-link]
 [![Docs][docs-image]][docs-link]
-![Apache2/MIT licensed][license-image]
-![Rust Version][rustc-image]
+[![Apache2/MIT licensed][license-image]][license-link]
 [![Build Status][build-image]][build-link]
 
 This crate provides a collection of traits used by implementations of Random Number Generation (RNG)
@@ -28,11 +27,11 @@ at your option.
 
 [//]: # (badges)
 
-[crate-image]: https://img.shields.io/crates/v/rand_core.svg
+[crate-badge]: https://img.shields.io/crates/v/rand_core.svg
 [crate-link]: https://crates.io/crates/rand_core
 [docs-image]: https://docs.rs/rand_core/badge.svg
 [docs-link]: https://docs.rs/rand_core
 [license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
-[rustc-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
 [build-image]: https://github.com/rust-random/rand_core/actions/workflows/test.yml/badge.svg?branch=master
+[license-link]: #license
 [build-link]: https://github.com/rust-random/rand_core/actions/workflows/test.yml?query=branch:master
