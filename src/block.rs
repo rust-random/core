@@ -164,6 +164,38 @@ impl<R: BlockRngCore> BlockRng<R> {
     }
 }
 
+impl<R: BlockRngCore<Item = u32>> BlockRng<R> {
+    /// Access the unused part of the results buffer
+    ///
+    /// This is a low-level interface. Results are not automatically marked as
+    /// consumed.
+    #[inline]
+    pub fn remaining_results(&self) -> &[u32] {
+        &self.results.as_ref()[self.index..]
+    }
+
+    /// Reconstruct from a core and a remaining-results buffer.
+    ///
+    /// This may be used to deserialize using a `core` and the output of
+    /// [`Self::remaining_results`].
+    ///
+    /// Returns `None` if `remaining_results` is too long.
+    pub fn from_core_and_remaining_results(core: R, remaining_results: &[u32]) -> Option<Self> {
+        let mut results = R::Results::default();
+        if remaining_results.len() <= results.as_ref().len() {
+            let index = results.as_ref().len() - remaining_results.len();
+            results.as_mut()[index..].copy_from_slice(remaining_results);
+            Some(BlockRng {
+                results,
+                index,
+                core,
+            })
+        } else {
+            None
+        }
+    }
+}
+
 impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
