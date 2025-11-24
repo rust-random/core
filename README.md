@@ -1,9 +1,13 @@
 # rand_core: core random number generation traits
 
+<div class="badges">
+  
 [![crate][crate-badge]][crate-link]
 [![Docs][docs-image]][docs-link]
 [![Apache2/MIT licensed][license-image]][license-link]
 [![Build Status][build-image]][build-link]
+
+</div>
 
 This crate provides a collection of traits used by implementations of Random Number Generation (RNG)
 algorithms. Additionally, it includes helper utilities that assist with the implementation
