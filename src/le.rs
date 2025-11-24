@@ -1,75 +1,7 @@
 //! # Little-Endian utilities
-//!
-//! For cross-platform reproducibility, Little-Endian order (least-significant
-//! part first) has been chosen as the standard for inter-type conversion.
-//! For example, ``next_u64_via_u32`] takes `u32`
-//! values `x, y`, then outputs `(y << 32) | x`.
-//!
-//! Byte-swapping (like the std `to_le` functions) is only needed to convert
-//! to/from byte sequences, and since its purpose is reproducibility,
-//! non-reproducible sources (e.g. `OsRng`) need not bother with it.
-//!
-//! ### Implementing [`RngCore`]
-//!
-//! Usually an implementation of [`RngCore`] will implement one of the three
-//! methods over its internal source. The following helpers are provided for
-//! the remaining implementations.
-//!
-//! **`fn next_u32`:**
-//! -   `self.next_u64() as u32`
-//! -   `(self.next_u64() >> 32) as u32`
-//! -   <code>[next_u32_via_fill][](self)</code>
-//!
-//! **`fn next_u64`:**
-//! -   <code>[next_u64_via_u32][](self)</code>
-//! -   <code>[next_u64_via_fill][](self)</code>
-//!
-//! **`fn fill_bytes`:**
-//! -   <code>[fill_bytes_via_next][](self, dest)</code>
-//!
-//! ### Implementing [`SeedableRng`]
-//!
-//! In many cases, [`SeedableRng::Seed`] must be converted to `[u32]` or
-//! `[u64]`. The following helpers are provided:
-//!
-//! - [`read_u32_into`]
-//! - [`read_u64_into`]
 
-use crate::RngCore;
 #[allow(unused)]
 use crate::SeedableRng;
-
-/// Implement `next_u64` via `next_u32`, little-endian order.
-pub fn next_u64_via_u32<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
-    // Use LE; we explicitly generate one value before the next.
-    let x = u64::from(rng.next_u32());
-    let y = u64::from(rng.next_u32());
-    (y << 32) | x
-}
-
-/// Implement `fill_bytes` via `next_u64` and `next_u32`, little-endian order.
-///
-/// The fastest way to fill a slice is usually to work as long as possible with
-/// integers. That is why this method mostly uses `next_u64`, and only when
-/// there are 4 or less bytes remaining at the end of the slice it uses
-/// `next_u32` once.
-pub fn fill_bytes_via_next<R: RngCore + ?Sized>(rng: &mut R, dest: &mut [u8]) {
-    let mut left = dest;
-    while left.len() >= 8 {
-        let (l, r) = { left }.split_at_mut(8);
-        left = r;
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        l.copy_from_slice(&chunk);
-    }
-    let n = left.len();
-    if n > 4 {
-        let chunk: [u8; 8] = rng.next_u64().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
-    } else if n > 0 {
-        let chunk: [u8; 4] = rng.next_u32().to_le_bytes();
-        left.copy_from_slice(&chunk[..n]);
-    }
-}
 
 pub(crate) trait Observable: Copy {
     type Bytes: Sized + AsRef<[u8]>;
@@ -118,20 +50,6 @@ pub(crate) fn fill_via_chunks<T: Observable>(src: &[T], dest: &mut [u8]) -> (usi
         }
     }
     (num_chunks, byte_len)
-}
-
-/// Implement `next_u32` via `fill_bytes`, little-endian order.
-pub fn next_u32_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u32 {
-    let mut buf = [0; 4];
-    rng.fill_bytes(&mut buf);
-    u32::from_le_bytes(buf)
-}
-
-/// Implement `next_u64` via `fill_bytes`, little-endian order.
-pub fn next_u64_via_fill<R: RngCore + ?Sized>(rng: &mut R) -> u64 {
-    let mut buf = [0; 8];
-    rng.fill_bytes(&mut buf);
-    u64::from_le_bytes(buf)
 }
 
 /// Fills `dst: &mut [u32]` from `src`
