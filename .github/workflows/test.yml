@@ -96,8 +96,7 @@ jobs:
           cargo generate-lockfile -Z minimal-versions
       - name: Test rand_core
         run: |
-          cargo test --target ${{ matrix.target }} --no-default-features
-          cargo test --target ${{ matrix.target }} --features serde
+          cargo test --target ${{ matrix.target }}
 
   test-cross:
     runs-on: ${{ matrix.os }}
@@ -137,11 +136,9 @@ jobs:
           rustup toolchain install nightly --component miri
           rustup override set nightly
           cargo miri setup
-      - name: Test rand
+      - name: Test (miri)
         run: |
           cargo miri test
-          cargo miri test --features=serde
-          cargo miri test --no-default-features
 
   test-no-std:
     runs-on: ubuntu-latest
