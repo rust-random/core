@@ -1,3 +1,6 @@
+// Hidde badges and from generated docs
+//! <style> .badges { display: none; } </style>
+
 #![no_std]
 #![doc = include_str!("../README.md")]
 #![doc(
