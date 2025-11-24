@@ -23,14 +23,60 @@
 #![deny(missing_docs)]
 #![deny(missing_debug_implementations)]
 #![deny(clippy::undocumented_unsafe_blocks)]
-#![doc(test(attr(allow(unused_variables), deny(warnings))))]
+#![doc(test(attr(allow(unused), deny(warnings))))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 
 use core::{fmt, ops::DerefMut};
 
-pub mod block;
 pub mod le;
+mod sealed;
+
+/// A random generator
+pub trait Generator {
+    /// The result type.
+    ///
+    /// This could be a simple word like `u64` or an array like `[u32; 16]`.
+    type Result;
+
+    /// Generate a new result.
+    ///
+    /// Since [`Self::Result`] may be large, the output is passed by reference.
+    /// Word generators should likely implement this as a shim over another
+    /// method:
+    /// ```
+    /// pub struct CountingGenerator(u64);
+    /// impl CountingGenerator {
+    ///     fn next(&mut self) -> u64 {
+    ///         let x = self.0;
+    ///         self.0 = self.0.wrapping_add(1);
+    ///         x
+    ///     }
+    /// }
+    ///
+    /// impl rand_core::Generator for CountingGenerator {
+    ///     type Result = u64;
+    ///
+    ///     #[inline]
+    ///     fn generate(&mut self, result: &mut Self::Result) {
+    ///         *result = self.next();
+    ///     }
+    /// }
+    /// ```
+    fn generate(&mut self, result: &mut Self::Result);
+}
+
+/// A cryptographically secure generator
+///
+/// This is a marker trait used to indicate that a [`Generator`] implementation
+/// is supposed to be cryptographically secure.
+///
+/// Mock generators should not implement this trait *except* under a
+/// `#[cfg(test)]` attribute to ensure that mock "crypto" generators cannot be
+/// used in production.
+///
+/// See [`CryptoRng`] docs for more information.
+pub trait CryptoGenerator: Generator {}
 
 /// Implementation-level interface for RNGs
 ///
@@ -64,7 +110,7 @@ pub mod le;
 ///
 /// Typically an RNG will implement only one of the methods available
 /// in this trait directly, then use the helper functions from the
-/// [`le` module](crate::le) to implement the other methods.
+/// [`le`] module to implement the other methods.
 ///
 /// Note that implementors of [`RngCore`] also automatically implement
 /// the [`TryRngCore`] trait with the `Error` associated type being
@@ -520,8 +566,7 @@ mod test {
             type Seed = [u8; 8];
 
             fn from_seed(seed: Self::Seed) -> Self {
-                let mut x = [0u64; 1];
-                le::read_u64_into(&seed, &mut x);
+                let x: [u64; 1] = le::read_words(&seed);
                 SeedableNum(x[0])
             }
         }
