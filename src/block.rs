@@ -1,6 +1,6 @@
-//! The `BlockRngCore` trait and implementation helpers
+//! The `Generator` trait and implementation helpers
 //!
-//! The [`BlockRngCore`] trait exists to assist in the implementation of RNGs
+//! The [`Generator`] trait exists to assist in the implementation of RNGs
 //! which generate a block of data in a cache instead of returning generated
 //! values directly.
 //!
@@ -15,15 +15,14 @@
 //!
 //! ```no_run
 //! use rand_core::{RngCore, SeedableRng};
-//! use rand_core::block::{BlockRngCore, BlockRng};
+//! use rand_core::block::{Generator, BlockRng};
 //!
 //! struct MyRngCore;
 //!
-//! impl BlockRngCore for MyRngCore {
-//!     type Item = u32;
-//!     type Results = [u32; 16];
+//! impl Generator for MyRngCore {
+//!     type Output = [u32; 16];
 //!
-//!     fn generate(&mut self, results: &mut Self::Results) {
+//!     fn generate(&mut self, output: &mut Self::Output) {
 //!         unimplemented!()
 //!     }
 //! }
@@ -35,45 +34,47 @@
 //!     }
 //! }
 //!
-//! // optionally, also implement CryptoBlockRng for MyRngCore
+//! // optionally, also implement CryptoGenerator for MyRngCore
 //!
 //! // Final RNG.
 //! let mut rng = BlockRng::<MyRngCore>::seed_from_u64(0);
 //! println!("First value: {}", rng.next_u32());
 //! ```
 //!
-//! [`BlockRngCore`]: crate::block::BlockRngCore
+//! [`Generator`]: crate::block::Generator
 //! [`fill_bytes`]: RngCore::fill_bytes
 
 use crate::le::fill_via_chunks;
 use crate::{CryptoRng, RngCore, SeedableRng, TryRngCore};
 use core::fmt;
 
-/// A trait for RNGs which do not generate random numbers individually, but in
-/// blocks (typically `[u32; N]`). This technique is commonly used by
-/// cryptographic RNGs to improve performance.
-///
-/// See the [module][crate::block] documentation for details.
-pub trait BlockRngCore {
-    /// Results element type, e.g. `u32`.
-    type Item;
+/// A random (block) generator
+pub trait Generator {
+    /// The output type.
+    ///
+    /// For use with [`rand_core::block`](crate::block) code this must be `[u32; _]` or `[u64; _]`.
+    type Output;
 
-    /// Results type. This is the 'block' an RNG implementing `BlockRngCore`
-    /// generates, which will usually be an array like `[u32; 16]`.
-    type Results: AsRef<[Self::Item]> + AsMut<[Self::Item]> + Default;
-
-    /// Generate a new block of results.
-    fn generate(&mut self, results: &mut Self::Results);
+    /// Generate a new block of `output`.
+    ///
+    /// This must fill `output` with random data.
+    fn generate(&mut self, output: &mut Self::Output);
 }
 
-/// A marker trait used to indicate that an [`RngCore`] implementation is
-/// supposed to be cryptographically secure.
+/// A cryptographically secure generator
+///
+/// This is a marker trait used to indicate that a [`Generator`] implementation
+/// is supposed to be cryptographically secure.
+///
+/// Mock generators should not implement this trait *except* under a
+/// `#[cfg(test)]` attribute to ensure that mock "crypto" generators cannot be
+/// used in production.
 ///
 /// See [`CryptoRng`] docs for more information.
-pub trait CryptoBlockRng: BlockRngCore {}
+pub trait CryptoGenerator: Generator {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
-/// [`BlockRngCore`] with `u32` array buffer; i.e. this can be used to implement
+/// [`Generator`] with `u32` array buffer; i.e. this can be used to implement
 /// a full RNG from just a `generate` function.
 ///
 /// The `core` field may be accessed directly but the results buffer may not.
@@ -86,7 +87,7 @@ pub trait CryptoBlockRng: BlockRngCore {}
 ///
 /// `BlockRng` has heavily optimized implementations of the [`RngCore`] methods
 /// reading values from the results buffer, as well as
-/// calling [`BlockRngCore::generate`] directly on the output array when
+/// calling [`Generator::generate`] directly on the output array when
 /// [`fill_bytes`] is called on a large array. These methods also handle
 /// the bookkeeping of when to generate a new batch of values.
 ///
@@ -106,34 +107,32 @@ pub trait CryptoBlockRng: BlockRngCore {}
 /// [`next_u64`]: RngCore::next_u64
 /// [`fill_bytes`]: RngCore::fill_bytes
 #[derive(Clone)]
-pub struct BlockRng<R: BlockRngCore> {
-    results: R::Results,
+pub struct BlockRng<G: Generator> {
+    results: G::Output,
     index: usize,
     /// The *core* part of the RNG, implementing the `generate` function.
-    pub core: R,
+    pub core: G,
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng<R> {
+impl<G: Generator + fmt::Debug> fmt::Debug for BlockRng<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng")
             .field("core", &self.core)
-            .field("result_len", &self.results.as_ref().len())
             .field("index", &self.index)
             .finish()
     }
 }
 
-impl<R: BlockRngCore> BlockRng<R> {
+impl<const N: usize, G: Generator<Output = [u32; N]>> BlockRng<G> {
     /// Create a new `BlockRng` from an existing RNG implementing
-    /// `BlockRngCore`. Results will be generated on first use.
+    /// `Generator`. Results will be generated on first use.
     #[inline]
-    pub fn new(core: R) -> BlockRng<R> {
-        let results_empty = R::Results::default();
+    pub fn new(core: G) -> BlockRng<G> {
         BlockRng {
             core,
-            index: results_empty.as_ref().len(),
-            results: results_empty,
+            index: N,
+            results: [0; N],
         }
     }
 
@@ -164,7 +163,7 @@ impl<R: BlockRngCore> BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
+impl<const N: usize, G: Generator<Output = [u32; N]>> RngCore for BlockRng<G> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         if self.index >= self.results.as_ref().len() {
@@ -217,34 +216,34 @@ impl<R: BlockRngCore<Item = u32>> RngCore for BlockRng<R> {
     }
 }
 
-impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng<R> {
-    type Seed = R::Seed;
+impl<const N: usize, G: Generator<Output = [u32; N]> + SeedableRng> SeedableRng for BlockRng<G> {
+    type Seed = G::Seed;
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(R::from_seed(seed))
+        Self::new(G::from_seed(seed))
     }
 
     #[inline(always)]
     fn seed_from_u64(seed: u64) -> Self {
-        Self::new(R::seed_from_u64(seed))
+        Self::new(G::seed_from_u64(seed))
     }
 
     #[inline(always)]
     fn from_rng<S: RngCore + ?Sized>(rng: &mut S) -> Self {
-        Self::new(R::from_rng(rng))
+        Self::new(G::from_rng(rng))
     }
 
     #[inline(always)]
     fn try_from_rng<S: TryRngCore + ?Sized>(rng: &mut S) -> Result<Self, S::Error> {
-        R::try_from_rng(rng).map(Self::new)
+        G::try_from_rng(rng).map(Self::new)
     }
 }
 
-impl<R: CryptoBlockRng + BlockRngCore<Item = u32>> CryptoRng for BlockRng<R> {}
+impl<const N: usize, G: CryptoGenerator<Output = [u32; N]>> CryptoRng for BlockRng<G> {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
-/// [`BlockRngCore`] with `u64` array buffer; i.e. this can be used to implement
+/// [`Generator`] with `u64` array buffer; i.e. this can be used to implement
 /// a full RNG from just a `generate` function.
 ///
 /// This is similar to [`BlockRng`], but specialized for algorithms that operate
@@ -264,32 +263,31 @@ impl<R: CryptoBlockRng + BlockRngCore<Item = u32>> CryptoRng for BlockRng<R> {}
 /// [`next_u64`]: RngCore::next_u64
 /// [`fill_bytes`]: RngCore::fill_bytes
 #[derive(Clone)]
-pub struct BlockRng64<R: BlockRngCore + ?Sized> {
-    results: R::Results,
+pub struct BlockRng64<G: Generator + ?Sized> {
+    results: G::Output,
     index: usize,
     half_used: bool, // true if only half of the previous result is used
     /// The *core* part of the RNG, implementing the `generate` function.
-    pub core: R,
+    pub core: G,
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<R: BlockRngCore + fmt::Debug> fmt::Debug for BlockRng64<R> {
+impl<G: Generator + fmt::Debug> fmt::Debug for BlockRng64<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng64")
             .field("core", &self.core)
-            .field("result_len", &self.results.as_ref().len())
             .field("index", &self.index)
             .field("half_used", &self.half_used)
             .finish()
     }
 }
 
-impl<R: BlockRngCore> BlockRng64<R> {
+impl<const N: usize, G: Generator<Output = [u64; N]>> BlockRng64<G> {
     /// Create a new `BlockRng` from an existing RNG implementing
-    /// `BlockRngCore`. Results will be generated on first use.
+    /// `Generator`. Results will be generated on first use.
     #[inline]
-    pub fn new(core: R) -> BlockRng64<R> {
-        let results_empty = R::Results::default();
+    pub fn new(core: G) -> BlockRng64<G> {
+        let results_empty = [0; N];
         BlockRng64 {
             core,
             index: results_empty.as_ref().len(),
@@ -327,7 +325,7 @@ impl<R: BlockRngCore> BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
+impl<const N: usize, G: Generator<Output = [u64; N]>> RngCore for BlockRng64<G> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         let mut index = self.index - self.half_used as usize;
@@ -379,35 +377,35 @@ impl<R: BlockRngCore<Item = u64>> RngCore for BlockRng64<R> {
     }
 }
 
-impl<R: BlockRngCore + SeedableRng> SeedableRng for BlockRng64<R> {
-    type Seed = R::Seed;
+impl<const N: usize, G: Generator<Output = [u64; N]> + SeedableRng> SeedableRng for BlockRng64<G> {
+    type Seed = G::Seed;
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(R::from_seed(seed))
+        Self::new(G::from_seed(seed))
     }
 
     #[inline(always)]
     fn seed_from_u64(seed: u64) -> Self {
-        Self::new(R::seed_from_u64(seed))
+        Self::new(G::seed_from_u64(seed))
     }
 
     #[inline(always)]
     fn from_rng<S: RngCore + ?Sized>(rng: &mut S) -> Self {
-        Self::new(R::from_rng(rng))
+        Self::new(G::from_rng(rng))
     }
 
     #[inline(always)]
     fn try_from_rng<S: TryRngCore + ?Sized>(rng: &mut S) -> Result<Self, S::Error> {
-        R::try_from_rng(rng).map(Self::new)
+        G::try_from_rng(rng).map(Self::new)
     }
 }
 
-impl<R: CryptoBlockRng + BlockRngCore<Item = u64>> CryptoRng for BlockRng64<R> {}
+impl<const N: usize, G: CryptoGenerator<Output = [u64; N]>> CryptoRng for BlockRng64<G> {}
 
 #[cfg(test)]
 mod test {
-    use crate::block::{BlockRng, BlockRng64, BlockRngCore};
+    use crate::block::{BlockRng, BlockRng64, Generator};
     use crate::{RngCore, SeedableRng};
 
     #[derive(Debug, Clone)]
@@ -415,13 +413,12 @@ mod test {
         counter: u32,
     }
 
-    impl BlockRngCore for DummyRng {
-        type Item = u32;
-        type Results = [u32; 16];
+    impl Generator for DummyRng {
+        type Output = [u32; 16];
 
-        fn generate(&mut self, results: &mut Self::Results) {
-            for r in results {
-                *r = self.counter;
+        fn generate(&mut self, output: &mut Self::Output) {
+            for item in output {
+                *item = self.counter;
                 self.counter = self.counter.wrapping_add(3511615421);
             }
         }
@@ -466,13 +463,12 @@ mod test {
         counter: u64,
     }
 
-    impl BlockRngCore for DummyRng64 {
-        type Item = u64;
-        type Results = [u64; 8];
+    impl Generator for DummyRng64 {
+        type Output = [u64; 8];
 
-        fn generate(&mut self, results: &mut Self::Results) {
-            for r in results {
-                *r = self.counter;
+        fn generate(&mut self, output: &mut Self::Output) {
+            for item in output {
+                *item = self.counter;
                 self.counter = self.counter.wrapping_add(2781463553396133981);
             }
         }
