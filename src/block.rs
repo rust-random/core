@@ -107,15 +107,15 @@ pub trait CryptoGenerator: Generator {}
 /// [`next_u64`]: RngCore::next_u64
 /// [`fill_bytes`]: RngCore::fill_bytes
 #[derive(Clone)]
-pub struct BlockRng<R: Generator> {
-    results: R::Output,
+pub struct BlockRng<G: Generator> {
+    results: G::Output,
     index: usize,
     /// The *core* part of the RNG, implementing the `generate` function.
-    pub core: R,
+    pub core: G,
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<const N: usize, R: Generator<Output = [u32; N]> + fmt::Debug> fmt::Debug for BlockRng<R> {
+impl<const N: usize, G: Generator<Output = [u32; N]> + fmt::Debug> fmt::Debug for BlockRng<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng")
             .field("core", &self.core)
@@ -125,11 +125,11 @@ impl<const N: usize, R: Generator<Output = [u32; N]> + fmt::Debug> fmt::Debug fo
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u32; N]>> BlockRng<R> {
+impl<const N: usize, G: Generator<Output = [u32; N]>> BlockRng<G> {
     /// Create a new `BlockRng` from an existing RNG implementing
     /// `Generator`. Results will be generated on first use.
     #[inline]
-    pub fn new(core: R) -> BlockRng<R> {
+    pub fn new(core: G) -> BlockRng<G> {
         BlockRng {
             core,
             index: N,
@@ -164,7 +164,7 @@ impl<const N: usize, R: Generator<Output = [u32; N]>> BlockRng<R> {
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u32; N]>> RngCore for BlockRng<R> {
+impl<const N: usize, G: Generator<Output = [u32; N]>> RngCore for BlockRng<G> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         if self.index >= self.results.as_ref().len() {
@@ -217,31 +217,31 @@ impl<const N: usize, R: Generator<Output = [u32; N]>> RngCore for BlockRng<R> {
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u32; N]> + SeedableRng> SeedableRng for BlockRng<R> {
-    type Seed = R::Seed;
+impl<const N: usize, G: Generator<Output = [u32; N]> + SeedableRng> SeedableRng for BlockRng<G> {
+    type Seed = G::Seed;
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(R::from_seed(seed))
+        Self::new(G::from_seed(seed))
     }
 
     #[inline(always)]
     fn seed_from_u64(seed: u64) -> Self {
-        Self::new(R::seed_from_u64(seed))
+        Self::new(G::seed_from_u64(seed))
     }
 
     #[inline(always)]
     fn from_rng<S: RngCore + ?Sized>(rng: &mut S) -> Self {
-        Self::new(R::from_rng(rng))
+        Self::new(G::from_rng(rng))
     }
 
     #[inline(always)]
     fn try_from_rng<S: TryRngCore + ?Sized>(rng: &mut S) -> Result<Self, S::Error> {
-        R::try_from_rng(rng).map(Self::new)
+        G::try_from_rng(rng).map(Self::new)
     }
 }
 
-impl<const N: usize, R: CryptoGenerator<Output = [u32; N]>> CryptoRng for BlockRng<R> {}
+impl<const N: usize, G: CryptoGenerator<Output = [u32; N]>> CryptoRng for BlockRng<G> {}
 
 /// A wrapper type implementing [`RngCore`] for some type implementing
 /// [`Generator`] with `u64` array buffer; i.e. this can be used to implement
@@ -264,16 +264,16 @@ impl<const N: usize, R: CryptoGenerator<Output = [u32; N]>> CryptoRng for BlockR
 /// [`next_u64`]: RngCore::next_u64
 /// [`fill_bytes`]: RngCore::fill_bytes
 #[derive(Clone)]
-pub struct BlockRng64<R: Generator + ?Sized> {
-    results: R::Output,
+pub struct BlockRng64<G: Generator + ?Sized> {
+    results: G::Output,
     index: usize,
     half_used: bool, // true if only half of the previous result is used
     /// The *core* part of the RNG, implementing the `generate` function.
-    pub core: R,
+    pub core: G,
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<const N: usize, R: Generator<Output = [u64; N]> + fmt::Debug> fmt::Debug for BlockRng64<R> {
+impl<const N: usize, G: Generator<Output = [u64; N]> + fmt::Debug> fmt::Debug for BlockRng64<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng64")
             .field("core", &self.core)
@@ -284,11 +284,11 @@ impl<const N: usize, R: Generator<Output = [u64; N]> + fmt::Debug> fmt::Debug fo
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u64; N]>> BlockRng64<R> {
+impl<const N: usize, G: Generator<Output = [u64; N]>> BlockRng64<G> {
     /// Create a new `BlockRng` from an existing RNG implementing
     /// `Generator`. Results will be generated on first use.
     #[inline]
-    pub fn new(core: R) -> BlockRng64<R> {
+    pub fn new(core: G) -> BlockRng64<G> {
         let results_empty = [0; N];
         BlockRng64 {
             core,
@@ -327,7 +327,7 @@ impl<const N: usize, R: Generator<Output = [u64; N]>> BlockRng64<R> {
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u64; N]>> RngCore for BlockRng64<R> {
+impl<const N: usize, G: Generator<Output = [u64; N]>> RngCore for BlockRng64<G> {
     #[inline]
     fn next_u32(&mut self) -> u32 {
         let mut index = self.index - self.half_used as usize;
@@ -379,31 +379,31 @@ impl<const N: usize, R: Generator<Output = [u64; N]>> RngCore for BlockRng64<R> 
     }
 }
 
-impl<const N: usize, R: Generator<Output = [u64; N]> + SeedableRng> SeedableRng for BlockRng64<R> {
-    type Seed = R::Seed;
+impl<const N: usize, G: Generator<Output = [u64; N]> + SeedableRng> SeedableRng for BlockRng64<G> {
+    type Seed = G::Seed;
 
     #[inline(always)]
     fn from_seed(seed: Self::Seed) -> Self {
-        Self::new(R::from_seed(seed))
+        Self::new(G::from_seed(seed))
     }
 
     #[inline(always)]
     fn seed_from_u64(seed: u64) -> Self {
-        Self::new(R::seed_from_u64(seed))
+        Self::new(G::seed_from_u64(seed))
     }
 
     #[inline(always)]
     fn from_rng<S: RngCore + ?Sized>(rng: &mut S) -> Self {
-        Self::new(R::from_rng(rng))
+        Self::new(G::from_rng(rng))
     }
 
     #[inline(always)]
     fn try_from_rng<S: TryRngCore + ?Sized>(rng: &mut S) -> Result<Self, S::Error> {
-        R::try_from_rng(rng).map(Self::new)
+        G::try_from_rng(rng).map(Self::new)
     }
 }
 
-impl<const N: usize, R: CryptoGenerator<Output = [u64; N]>> CryptoRng for BlockRng64<R> {}
+impl<const N: usize, G: CryptoGenerator<Output = [u64; N]>> CryptoRng for BlockRng64<G> {}
 
 #[cfg(test)]
 mod test {
