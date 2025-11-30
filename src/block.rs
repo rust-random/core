@@ -115,11 +115,10 @@ pub struct BlockRng<G: Generator> {
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<const N: usize, G: Generator<Output = [u32; N]> + fmt::Debug> fmt::Debug for BlockRng<G> {
+impl<G: Generator + fmt::Debug> fmt::Debug for BlockRng<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng")
             .field("core", &self.core)
-            .field("result_len", &self.results.as_ref().len())
             .field("index", &self.index)
             .finish()
     }
@@ -273,11 +272,10 @@ pub struct BlockRng64<G: Generator + ?Sized> {
 }
 
 // Custom Debug implementation that does not expose the contents of `results`.
-impl<const N: usize, G: Generator<Output = [u64; N]> + fmt::Debug> fmt::Debug for BlockRng64<G> {
+impl<G: Generator + fmt::Debug> fmt::Debug for BlockRng64<G> {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("BlockRng64")
             .field("core", &self.core)
-            .field("result_len", &self.results.as_ref().len())
             .field("index", &self.index)
             .field("half_used", &self.half_used)
             .finish()
